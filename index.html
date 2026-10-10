@@ -115,8 +115,6 @@ mark{background:#ffd8a8;padding:0 2px;border-radius:3px}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -133,10 +131,9 @@ const firebaseConfig = {
   appId: "1:577095439891:web:2e8fc691446697e03891e6"
 };
 const CONFIGURED = !/^YOUR_/.test(firebaseConfig.apiKey);
-let auth = null, db = null;
+let db = null;
 if (CONFIGURED) {
   const fb = initializeApp(firebaseConfig);
-  auth = getAuth(fb); auth.languageCode = 'ko';
   db = getFirestore(fb);
 }
 
@@ -228,77 +225,93 @@ app.addEventListener('change', e => {
    ===================================================================== */
 function viewStart(){
   setTheme(false); S.view='start';
-  const last = localStorage.getItem('anoncard:lastClass') || '';
+  const last = localStorage.getItem('anoncard:lastCode') || '';
   app.innerHTML = `<div class="narrow">
     <div class="hero"><div class="big">🃏</div><h1>익명 카드로 알아가기</h1>
     <p class="hint">나를 닮은 카드를 만들고,<br>교생 쌤이 “이 카드는 누구일까?” 찾아가는 놀이예요.</p></div>
-    ${CONFIGURED ? '' : `<div class="warn err"><b>Firebase 설정이 아직 없어요.</b><br>index.html 위쪽 <code>firebaseConfig</code> 값을 채우고 다시 배포해 주세요. (README 참고)</div>`}
+    ${CONFIGURED ? '' : `<div class="warn err"><b>Firebase 설정이 아직 없어요.</b><br>index.html 위쪽 <code>firebaseConfig</code> 값을 채우고 다시 배포해 주세요.</div>`}
     <div class="panel">
-      <label class="f" for="code">학급 코드</label>
-      <input id="code" type="text" inputmode="latin" autocomplete="off" placeholder="선생님이 알려 준 코드" value="${esc(last)}" maxlength="20">
-      <div class="roles">
-        <button class="btn" data-act="start" data-role="student">🎒 나는 학생이에요</button>
-        <button class="btn sub" data-act="start" data-role="intern">🧑‍🏫 교생 쌤</button>
-        <button class="btn sub" data-act="start" data-role="teacher">🍎 담임 쌤</button>
-      </div>
-    </div></div>`;
+      <label class="f" for="code">입장 코드</label>
+      <input id="code" type="text" autocomplete="off" placeholder="선생님이 알려 준 코드" value="${esc(last)}" maxlength="30">
+      <div class="row" style="margin-top:12px"><button class="btn good grow" data-act="enter">들어가기</button></div>
+    </div>
+    <p style="text-align:center"><button class="btn sub small" data-act="newClass">🍎 담임 쌤: 새 학급 만들기</button></p></div>`;
+  $('#code').onkeydown = e => { if (e.key==='Enter') actions.enter().catch(showErr); };
 }
-actions.start = async (b) => {
+const normCode = x => String(x||'').trim().toLowerCase().replace(/\s/g,'');
+const codeRef = c => doc(db,'anoncodes',encodeURIComponent(c));
+const rnd = (n=6) => { const a='abcdefghjkmnpqrstuvwxyz23456789'; let r=''; for(let i=0;i<n;i++) r+=a[Math.floor(Math.random()*a.length)]; return r; };
+actions.enter = async () => {
   if (!CONFIGURED) return toast('Firebase 설정이 아직 없어요');
-  const role = b.dataset.role;
-  const code = ($('#code').value||'').trim().toLowerCase();
-  if (!/^[a-z0-9]{3,20}$/.test(code)) return toast('학급 코드는 영어·숫자 3~20자예요');
-  S.classId = code; S.role = role;
-  localStorage.setItem('anoncard:lastClass', code);
+  const code = normCode($('#code').value);
+  if (!code) return toast('코드를 입력해 주세요');
+  const snap = await getDoc(codeRef(code));
+  if (!snap.exists()) return toast('없는 코드예요. 코드를 다시 확인해 주세요');
+  const { classId, role } = snap.data();
+  S.classId = classId; S.role = role;
+  if (!await loadClass()) return toast('학급을 찾을 수 없어요');
+  localStorage.setItem('anoncard:lastCode', code);
   if (role==='student') return viewStudentLogin();
-  return viewStaffLogin(role);
+  if (role==='intern') return viewInternName();
+  return viewTeacher();
+};
+actions.newClass = () => {
+  if (!CONFIGURED) return toast('Firebase 설정이 아직 없어요');
+  setTheme(true); S.view='newClass';
+  app.innerHTML = `<div class="narrow"><div class="panel">
+    <h2>🍎 새 학급 만들기</h2>
+    <p class="hint">코드를 정하면 그 코드만으로 들어올 수 있어요. 코드는 나중에 설정에서 바꿀 수 있어요.</p>
+    <label class="f">담임 코드 (나만 알아야 해요)</label><input id="nt" type="text" value="${rnd(7)}">
+    <label class="f">교생 쌤 코드</label><input id="ni" type="text" value="${rnd(6)}">
+    <label class="f">학생 코드</label><input id="ns" type="text" value="${rnd(5)}">
+    <div class="row" style="margin-top:14px"><button class="btn good grow" data-act="createClass">학급 만들기</button><button class="btn sub" data-act="home">처음으로</button></div>
+  </div></div>`;
+};
+actions.createClass = async () => {
+  const t=normCode($('#nt').value), i=normCode($('#ni').value), st=normCode($('#ns').value);
+  if (!t||!i||!st) return toast('세 코드를 모두 입력해 주세요');
+  if (new Set([t,i,st]).size<3) return toast('세 코드는 서로 달라야 해요');
+  for (const c of [t,i,st]) if ((await getDoc(codeRef(c))).exists()) return toast(`'${c}' 코드는 이미 쓰고 있어요`);
+  const classId = rnd(10);
+  await setDoc(doc(db,'anoncls',classId), { phase:'writing', deadline:'', clueQuestions:DEFAULT_CLUES, keywords:DEFAULT_KEYWORDS, codes:{teacher:t,intern:i,student:st}, createdAt:serverTimestamp() });
+  const batch = writeBatch(db);
+  [[t,'teacher'],[i,'intern'],[st,'student']].forEach(([c,r])=>batch.set(codeRef(c),{classId,role:r}));
+  await batch.commit();
+  S.classId = classId; S.role='teacher'; localStorage.setItem('anoncard:lastCode', t);
+  await loadClass(); toast('학급을 만들었어요'); viewTeacher();
 };
 async function loadClass(){
-  const s = await getDoc(doc(db,'anoncls',S.classId));
-  S.cls = s.exists() ? s.data() : null;
+  const snap = await getDoc(doc(db,'anoncls',S.classId));
+  S.cls = snap.exists() ? snap.data() : null;
   return S.cls;
 }
 
 /* =====================================================================
    학생: 로그인
    ===================================================================== */
-async function viewStudentLogin(){
-  if (!await loadClass()) return toast('없는 학급 코드예요. 코드를 다시 확인해 주세요');
+function viewStudentLogin(){
   setTheme(false); S.view='stuLogin';
   app.innerHTML = `<div class="narrow"><div class="panel">
-    <h2>🎒 내 번호로 들어가기</h2>
+    <h2>🎒 내 번호 고르기</h2>
     <label class="f" for="num">내 번호</label>
     <input id="num" type="number" min="1" max="99" inputmode="numeric" placeholder="예: 7">
-    <label class="f" for="pin">비밀번호 (숫자 6자리)</label>
-    <input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
-    <p class="hint">처음이면 지금 정한 숫자가 내 비밀번호가 돼요. <b>꼭 기억해 두세요!</b></p>
+    <p class="hint">내 번호를 정확히 눌러야 내 카드가 열려요.</p>
     <div class="row"><button class="btn good grow" data-act="stuLogin">들어가기</button><button class="btn sub" data-act="home">처음으로</button></div>
   </div></div>`;
+  $('#num').onkeydown = e => { if (e.key==='Enter') actions.stuLogin().catch(showErr); };
 }
-actions.home = () => { if(auth) signOut(auth).catch(()=>{}); S.draft=null; viewStart(); };
+actions.home = () => { S.draft=null; viewStart(); };
 actions.stuLogin = async () => {
-  const num = parseInt($('#num').value,10), pin = ($('#pin').value||'').trim();
+  const num = parseInt($('#num').value,10);
   if (!(num>=1 && num<=99)) return toast('번호를 숫자로 써 주세요');
-  if (!/^\d{6}$/.test(pin)) return toast('비밀번호는 숫자 6자리예요');
-  const ver = (S.cls.pinVer||{})[num] || 0;
-  const email = `${S.classId}-${num}-v${ver}@card.app`;
-  try { await signInWithEmailAndPassword(auth,email,pin); }
-  catch(e){
-    if (['auth/invalid-credential','auth/user-not-found','auth/invalid-login-credentials'].includes(e.code)) {
-      if (!confirm(`${num}번으로 처음 시작할까요?\n(이미 만든 적이 있다면 비밀번호가 달라서 그런 거예요. 그땐 [취소])`)) return;
-      try { await createUserWithEmailAndPassword(auth,email,pin); }
-      catch(e2){ if (e2.code==='auth/email-already-in-use') return toast('비밀번호가 달라요. 기억이 안 나면 선생님께 말씀드려요'); throw e2; }
-    } else throw e;
-  }
-  S.user = auth.currentUser; S.num = num;
-  await loadMyCard();
+  S.num = num; await loadMyCard();
 };
 async function loadMyCard(){
-  const s = await getDocs(query(Col('cards'), where('ownerUid','==',S.user.uid)));
-  S.cardId=null; S.card=null; S.priv=null;
-  if (!s.empty) {
-    const d = s.docs[0]; S.cardId = d.id; S.card = d.data();
-    try { const p = await getDoc(C('private',d.id)); S.priv = p.exists()?p.data():{}; } catch(e){ S.priv={}; }
+  S.cardId = 'n'+S.num; S.card=null; S.priv=null;
+  const s1 = await getDoc(C('cards',S.cardId));
+  if (s1.exists()) {
+    S.card = s1.data();
+    const p = await getDoc(C('private',S.cardId)); S.priv = p.exists()?p.data():{};
   }
   await loadClass();
   viewStudentHome();
@@ -457,7 +470,7 @@ function liveNameCheck(){
 }
 async function nameTaken(n){
   const s = await getDoc(C('anonNames', n.toLowerCase()));
-  return s.exists() && s.data().ownerUid !== S.user.uid;
+  return s.exists() && s.data().num !== S.num;
 }
 actions.prev = () => { if (S.step===2) grabDrawing(); S.step--; viewWizard(); };
 actions.next = async () => {
@@ -482,20 +495,20 @@ actions.submit = async () => {
   const btn = document.querySelector('[data-act=submit]'); if (btn) btn.disabled = true;
   try {
     if (await nameTaken(d.anonName)) { if(btn)btn.disabled=false; return toast('그 사이에 다른 친구가 이름을 썼어요. 이름을 바꿔 주세요'); }
-    const uid = S.user.uid, id = S.cardId || doc(Col('cards')).id;
+    const id = 'n'+S.num;
     const nameKey = d.anonName.toLowerCase(), oldKey = S.card ? S.card.anonName.toLowerCase() : null;
     const shared = d.worryVisibility==='intern';
     const batch = writeBatch(db);
     if (oldKey && oldKey!==nameKey) batch.delete(C('anonNames',oldKey));
-    if (oldKey!==nameKey) batch.set(C('anonNames',nameKey),{ownerUid:uid});
+    if (oldKey!==nameKey) batch.set(C('anonNames',nameKey),{num:S.num});
     batch.set(C('cards',id),{
-      ownerUid:uid, anonName:d.anonName, drawing:d.drawing, dreamText:d.dreamText.trim(), dreamEmoji:d.dreamEmoji,
+      anonName:d.anonName, drawing:d.drawing, dreamText:d.dreamText.trim(), dreamEmoji:d.dreamEmoji,
       clues:d.clues.map(x=>x.trim()), secretHint:d.secretHint.trim(),
       worryVisibility:d.worryVisibility, worryChips:shared?d.worryChips:[], worryText:shared?d.worryText.trim():'',
       hidden: S.card ? !!S.card.hidden : false, submittedAt: serverTimestamp()
     });
     batch.set(C('private',id),{
-      ownerUid:uid, num:S.num, worryVisibility:d.worryVisibility,
+      num:S.num, worryVisibility:d.worryVisibility,
       worryChips:d.worryVisibility==='none'?[]:d.worryChips, worryText:d.worryVisibility==='none'?'':d.worryText.trim(), wantsTalk:!!d.wantsTalk
     });
     await batch.commit();
@@ -568,52 +581,28 @@ function grabDrawing(){
 /* =====================================================================
    이메일 로그인 (담임·교생)
    ===================================================================== */
-function viewStaffLogin(role){
-  setTheme(true); S.view='staffLogin'; S.staffRole = role;
-  const who = role==='teacher' ? '🍎 담임 쌤' : '🧑‍🏫 교생 쌤';
-  const lastEmail = localStorage.getItem('anoncard:lastEmail') || '';
-  app.innerHTML = `<div class="narrow"><div class="panel">
-    <h2>${who} 로그인</h2>
-    <p class="hint">학급 코드: <b>${esc(S.classId)}</b>${role==='intern'?'<br>담임 선생님이 등록한 이메일로 로그인해야 해요.':'<br>처음이면 같은 이메일·비밀번호로 가입돼요.'}</p>
-    <label class="f" for="semail">이메일</label>
-    <input id="semail" type="text" inputmode="email" autocomplete="username" placeholder="example@gmail.com" value="${esc(lastEmail)}">
-    <label class="f" for="spw">비밀번호 (6자 이상)</label>
-    <input id="spw" type="password" autocomplete="current-password" placeholder="••••••">
-    <div class="row" style="margin-top:14px"><button class="btn good grow" data-act="staffLogin">로그인</button><button class="btn sub" data-act="home">처음으로</button></div>
+function viewInternName(){
+  setTheme(true); S.view='internName';
+  if (S.cls.phase==='writing') {
+    app.innerHTML = `<div class="narrow"><div class="panel"><h2>🧑‍🏫 교생 쌤, 반가워요!</h2><p>아직 아이들이 카드를 만드는 중이에요. 담임 선생님이 마감하면 열려요.</p><button class="btn sub" data-act="home">처음으로</button></div></div>`;
+    return;
+  }
+  const last = localStorage.getItem('anoncard:internName') || '';
+  app.innerHTML = `<div class="narrow"><div class="panel"><h2>🧑‍🏫 교생 쌤, 반가워요!</h2>
+    <label class="f" for="iname">내 이름 (내 노트를 구분하는 데만 써요)</label>
+    <input id="iname" type="text" maxlength="20" value="${esc(last)}" placeholder="예: 김교생">
+    <div class="row" style="margin-top:14px"><button class="btn good grow" data-act="internEnter">카드 보러 가기</button><button class="btn sub" data-act="home">처음으로</button></div>
   </div></div>`;
+  $('#iname').onkeydown = e => { if (e.key==='Enter') actions.internEnter().catch(showErr); };
 }
-actions.staffLogin = async () => {
-  const email = ($('#semail').value||'').trim().toLowerCase(), pw = $('#spw').value||'';
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast('이메일 주소를 확인해 주세요');
-  if (/@card\.app$/.test(email)) return toast('이 이메일은 쓸 수 없어요');
-  if (pw.length<6) return toast('비밀번호는 6자 이상이에요');
-  localStorage.setItem('anoncard:lastEmail', email);
-  try { await signInWithEmailAndPassword(auth,email,pw); }
-  catch(e){
-    if (['auth/invalid-credential','auth/user-not-found','auth/invalid-login-credentials'].includes(e.code)) {
-      if (!confirm('이 이메일로 처음이에요? 새로 가입할까요?\n(가입한 적이 있다면 비밀번호가 달라서 그런 거예요. 그땐 [취소])')) return;
-      try { await createUserWithEmailAndPassword(auth,email,pw); }
-      catch(e2){ if (e2.code==='auth/email-already-in-use') return toast('비밀번호가 달라요'); throw e2; }
-    } else throw e;
-  }
-  await afterStaff(S.staffRole);
+actions.internEnter = async () => {
+  const name = ($('#iname').value||'').trim();
+  const id = name.replace(/[\s\/\\.]/g,'').slice(0,20);
+  if (!id) return toast('이름을 입력해 주세요');
+  localStorage.setItem('anoncard:internName', name);
+  S.internName = name; S.internId = id;
+  await viewIntern();
 };
-async function afterStaff(role){
-  S.user = auth.currentUser;
-  const cls = await loadClass();
-  if (role==='teacher') {
-    if (!cls) {
-      if (!confirm(`'${S.classId}' 학급이 아직 없어요. 새 학급으로 만들까요?`)) return;
-      await setDoc(doc(db,'anoncls',S.classId), { teacherUid:S.user.uid, phase:'writing', deadline:'', clueQuestions:DEFAULT_CLUES, keywords:DEFAULT_KEYWORDS, pinVer:{}, createdAt:serverTimestamp() });
-      await setDoc(C('config','access'), { internEmails:[] });
-      await loadClass();
-    } else if (cls.teacherUid !== S.user.uid) return toast('이 학급의 담임 계정이 아니에요');
-    return viewTeacher();
-  }
-  if (!cls) return toast('없는 학급 코드예요');
-  if (cls.phase==='writing') return toast('아직 아이들이 카드를 만드는 중이에요. 마감 후에 열려요');
-  return viewIntern();
-}
 
 /* =====================================================================
    교생 쌤
@@ -621,7 +610,7 @@ async function afterStaff(role){
 async function loadIntern(){
   const [cs, ns] = await Promise.all([
     getDocs(query(Col('cards'), where('hidden','==',false))),
-    getDocs(query(Col('internNotes'), where('internUid','==',S.user.uid)))
+    getDocs(query(Col('internNotes'), where('internId','==',S.internId)))
   ]);
   S.cards = cs.docs.map(d=>({id:d.id, ...d.data()}));
   S.notes = {}; ns.docs.forEach(d=>{ const n=d.data(); S.notes[n.cardId]=n; });
@@ -702,9 +691,9 @@ actions.saveNote = async () => {
   const id = S.openId, old = S.notes[id] || {observations:[]};
   const obs = (old.observations||[]).slice(); const t = ($('#mObs').value||'').trim();
   if (t) obs.push({date:todayStr(), text:t});
-  const note = { internUid:S.user.uid, cardId:id, guess:($('#mGuess').value||'').trim(), confidence:+$('#mConf').value, status:$('#mStatus').value,
+  const note = { internId:S.internId, internName:S.internName, cardId:id, guess:($('#mGuess').value||'').trim(), confidence:+$('#mConf').value, status:$('#mStatus').value,
     observations:obs, sharedWithTeacher:$('#mShare').checked, updatedAt:serverTimestamp() };
-  await setDoc(C('internNotes', S.user.uid+'_'+id), note);
+  await setDoc(C('internNotes', S.internId+'_'+id), note);
   S.notes[id] = note; actions.closeModal(); renderIntern(); toast('저장했어요');
 };
 actions.internNotes = () => {
@@ -725,7 +714,7 @@ actions.internNotes = () => {
 actions.backIntern = () => renderIntern();
 actions.delMyNotes = async () => {
   if (!confirm('내 노트를 모두 삭제할까요? 되돌릴 수 없어요.')) return;
-  for (const id of Object.keys(S.notes)) await deleteDoc(C('internNotes', S.user.uid+'_'+id));
+  for (const id of Object.keys(S.notes)) await deleteDoc(C('internNotes', S.internId+'_'+id));
   S.notes = {}; toast('삭제했어요'); renderIntern();
 };
 
@@ -733,15 +722,13 @@ actions.delMyNotes = async () => {
    담임 쌤
    ===================================================================== */
 async function loadTeacher(){
-  const [cs, ps, rs, ac, ns] = await Promise.all([
+  const [cs, ps, rs, ns] = await Promise.all([
     getDocs(Col('cards')), getDocs(Col('private')), getDocs(Col('roster')),
-    getDoc(C('config','access')),
     getDocs(query(Col('internNotes'), where('sharedWithTeacher','==',true)))
   ]);
   S.cards = cs.docs.map(d=>({id:d.id,...d.data()}));
   S.privs = {}; ps.docs.forEach(d=>S.privs[d.id]=d.data());
   S.roster = {}; rs.docs.forEach(d=>S.roster[d.id]=d.data().realName);
-  S.access = ac.exists()?ac.data():{internEmails:[]};
   S.sharedNotes = ns.docs.map(d=>d.data());
 }
 async function viewTeacher(tab){
@@ -775,10 +762,12 @@ function tabSettings(){
     <p class="hint">한 줄에 한 명씩 “번호 이름” 으로 붙여 넣으세요. (엑셀에서 두 열을 복사해도 돼요) 실명은 담임만 볼 수 있어요.</p>
     <textarea id="rosterTx" style="min-height:160px" placeholder="1 김하늘&#10;2 이바다">${esc(rosterText)}</textarea>
     <button class="btn" data-act="saveRoster">명단 저장</button></div>
-  <div class="panel"><h3>3. 교생 쌤 등록</h3>
-    <p class="hint">교생 쌤이 로그인에 쓸 이메일을 한 줄에 하나씩 적어요. 교생 쌤은 이 이메일과 원하는 비밀번호(6자 이상)로 직접 가입해요.</p>
-    <textarea id="internTx" placeholder="intern1@example.com">${esc((S.access.internEmails||[]).join('\n'))}</textarea>
-    <button class="btn" data-act="saveInterns">교생 저장</button></div>
+  <div class="panel"><h3>3. 입장 코드</h3>
+    <p class="hint">코드만 입력하면 들어올 수 있어요. 학생·교생 쌤에게는 해당 코드만 알려 주세요.</p>
+    <label class="f">학생 코드</label><input type="text" id="cs" value="${esc((cls.codes||{}).student||'')}">
+    <label class="f">교생 쌤 코드</label><input type="text" id="ci" value="${esc((cls.codes||{}).intern||'')}">
+    <label class="f">담임 코드 (나만 알기)</label><input type="text" id="ct" value="${esc((cls.codes||{}).teacher||'')}">
+    <button class="btn" data-act="saveCodes" style="margin-top:10px">코드 저장</button></div>
   <div class="panel"><h3>4. 단서 질문 / 위험 키워드</h3>
     <p class="hint">빈칸은 <code>____</code> 로 표시해요. (카드 작성이 시작된 뒤에 바꾸면 이미 쓴 단서와 어긋날 수 있어요)</p>
     ${[0,1,2].map(i=>`<input type="text" class="cq" value="${esc(clueQs()[i])}" style="margin-bottom:6px">`).join('')}
@@ -814,9 +803,21 @@ actions.saveRoster = async () => {
   Object.entries(map).forEach(([n,nm])=>batch.set(C('roster',n),{realName:nm}));
   await batch.commit(); await viewTeacher('settings'); toast(`${Object.keys(map).length}명 저장했어요`);
 };
-actions.saveInterns = async () => {
-  const emails = $('#internTx').value.split(/[\n,;\s]+/).map(s=>s.trim().toLowerCase()).filter(Boolean);
-  await setDoc(C('config','access'),{internEmails:emails}); S.access={internEmails:emails}; toast(`교생 ${emails.length}명 저장했어요`);
+actions.saveCodes = async () => {
+  const nw = { student:normCode($('#cs').value), intern:normCode($('#ci').value), teacher:normCode($('#ct').value) };
+  const old = S.cls.codes || {};
+  if (Object.values(nw).some(x=>!x)) return toast('세 코드를 모두 입력해 주세요');
+  if (new Set(Object.values(nw)).size<3) return toast('세 코드는 서로 달라야 해요');
+  for (const r of ['student','intern','teacher']) if (nw[r]!==old[r]) {
+    if ((await getDoc(codeRef(nw[r]))).exists()) return toast(`'${nw[r]}' 코드는 이미 쓰고 있어요`);
+  }
+  const batch = writeBatch(db);
+  for (const r of ['student','intern','teacher']) if (nw[r]!==old[r]) {
+    if (old[r]) batch.delete(codeRef(old[r]));
+    batch.set(codeRef(nw[r]),{classId:S.classId,role:r});
+  }
+  batch.update(doc(db,'anoncls',S.classId),{codes:nw});
+  await batch.commit(); await loadClass(); toast('코드를 저장했어요');
 };
 actions.saveQs = async () => {
   const qs = [...document.querySelectorAll('.cq')].map(i=>i.value.trim());
@@ -838,12 +839,12 @@ actions.exportCsv = () => {
 };
 actions.wipe = async () => {
   if (prompt('정말 삭제할까요? 되돌릴 수 없어요. 삭제하려면 “삭제”라고 입력하세요.')!=='삭제') return;
-  for (const name of ['cards','private','roster','reveals','anonNames']) {
+  for (const name of ['cards','private','roster','reveals','anonNames','internNotes']) {
     const s = await getDocs(Col(name)); let b = writeBatch(db), n=0;
     for (const d of s.docs){ b.delete(d.ref); if(++n%400===0){ await b.commit(); b=writeBatch(db);} }
     await b.commit();
   }
-  await updateDoc(doc(db,'anoncls',S.classId),{phase:'writing', pinVer:{}});
+  await updateDoc(doc(db,'anoncls',S.classId),{phase:'writing'});
   await viewTeacher('settings'); toast('삭제했어요');
 };
 
@@ -876,12 +877,10 @@ actions.toggleHide = async b => {
 };
 actions.resetStudent = async b => {
   const c = S.cards.find(x=>x.id===b.dataset.id), n = numOf(c);
-  if (!confirm(`${n}번의 카드를 삭제하고 처음부터 다시 만들게 할까요? (비밀번호 분실·내용 문제 때 사용)`)) return;
+  if (!confirm(`${n}번의 카드를 삭제하고 처음부터 다시 만들게 할까요? (부적절한 내용 등 다시 쓰게 할 때 사용)`)) return;
   const batch = writeBatch(db);
   batch.delete(C('cards',c.id)); batch.delete(C('private',c.id)); batch.delete(C('anonNames',c.anonName.toLowerCase())); batch.delete(C('reveals',c.id));
-  const pinVer = Object.assign({}, S.cls.pinVer||{}); pinVer[n] = (pinVer[n]||0)+1;
-  batch.update(doc(db,'anoncls',S.classId),{pinVer});
-  await batch.commit(); await viewTeacher('worry'); toast('초기화했어요. 학생이 새 비밀번호로 다시 들어오면 돼요');
+  await batch.commit(); await viewTeacher('worry'); toast('초기화했어요. 학생이 다시 만들면 돼요');
 };
 
 function tabReveal(){
