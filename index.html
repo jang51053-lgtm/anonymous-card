@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>익명 카드로 알아가기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fff8ec; --ink:#3a2f2a; --sub:#7a6a60; --line:#f0dcc2; --card:#fff;
+  --main:#ff7a59; --main2:#ffb347; --good:#3bb273; --warn:#e8590c; --bad:#d6336c; --blue:#4c8dff;
+  --r:18px;
+}
+body.adult{ --bg:#f3f6fb; --ink:#233044; --sub:#62708a; --line:#d9e1ee; --main:#3d6fd9; --main2:#6f9cf0; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Gowun Dodum','Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:17px;line-height:1.55;min-height:100vh}
+h1,h2,h3{font-family:'Jua','Gowun Dodum',sans-serif;font-weight:400;margin:.2em 0}
+h1{font-size:2rem} h2{font-size:1.5rem} h3{font-size:1.2rem}
+#app{max-width:1000px;margin:0 auto;padding:16px 14px 80px}
+.narrow{max-width:520px;margin:0 auto}
+.panel{background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:18px;margin:14px 0;box-shadow:0 3px 0 var(--line)}
+.btn{font:inherit;font-family:'Jua','Gowun Dodum',sans-serif;font-size:1.05rem;border:0;border-radius:14px;padding:12px 18px;min-height:46px;cursor:pointer;background:var(--main);color:#fff;box-shadow:0 3px 0 rgba(0,0,0,.18);touch-action:manipulation}
+.btn:active{transform:translateY(2px);box-shadow:none}
+.btn.sub{background:#fff;color:var(--ink);border:2px solid var(--line);box-shadow:0 3px 0 var(--line)}
+.btn.good{background:var(--good)} .btn.bad{background:var(--bad)} .btn.small{padding:6px 12px;min-height:34px;font-size:.95rem}
+.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row.between{justify-content:space-between}
+.grow{flex:1}
+input[type=text],input[type=password],input[type=number],input[type=date],textarea,select{font:inherit;width:100%;padding:11px 13px;border:2px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);min-height:46px}
+textarea{min-height:90px;resize:vertical}
+label.f{display:block;margin:12px 0 4px;font-weight:700}
+.hint{color:var(--sub);font-size:.92rem}
+.warn{background:#fff3cd;border:2px solid #ffe08a;border-radius:12px;padding:10px 12px;margin:10px 0;font-size:.95rem}
+.err{background:#ffe3e8;border:2px solid #ffb3c1}
+.ok{background:#e3f8ec;border:2px solid #a8e5c1}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;cursor:pointer;font:inherit;min-height:40px}
+.chip.on{background:var(--main);border-color:var(--main);color:#fff}
+.emoji-chip{font-size:1.5rem;padding:4px 10px;line-height:1.3}
+.roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.roles .btn{padding:16px 10px}
+.progress{display:flex;gap:6px;margin:6px 0 14px}
+.progress i{flex:1;height:10px;border-radius:6px;background:var(--line)}
+.progress i.on{background:var(--main2)}
+.hero{text-align:center;padding:14px 0}
+.hero .big{font-size:3.2rem}
+/* drawing */
+.board-wrap{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
+#cv{width:min(100%,360px);aspect-ratio:1;border:3px solid var(--ink);border-radius:14px;background:
+ conic-gradient(#f3f3f3 25%,#fff 0 50%,#f3f3f3 0 75%,#fff 0) 0 0/20px 20px;touch-action:none;cursor:crosshair}
+.tools{display:flex;flex-direction:column;gap:8px;min-width:230px;flex:1;max-width:380px}
+.swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.sw{aspect-ratio:1;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--line);cursor:pointer;padding:0}
+.sw.on{box-shadow:0 0 0 3px var(--ink)}
+.stamps{display:flex;flex-wrap:wrap;gap:4px;max-height:130px;overflow:auto}
+.stamps button{font-size:1.5rem;border:2px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;min-width:42px;min-height:42px}
+.stamps button.on{border-color:var(--main);background:#fff0ea}
+.toolbtns{display:flex;flex-wrap:wrap;gap:6px}
+.toolbtns .btn{padding:8px 12px;min-height:40px}
+.toolbtns .btn.on{background:var(--ink)}
+/* profile card */
+.pcard{background:#fff;border:3px solid var(--ink);border-radius:22px;padding:14px;box-shadow:6px 6px 0 var(--main2);position:relative}
+.pcard .pic{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;border:2px solid var(--line);background:#f6f6f6;display:block}
+.pcard .nm{font-family:'Jua',sans-serif;font-size:1.5rem;margin:8px 0 2px}
+.pcard ul{margin:6px 0;padding-left:18px}
+.pcard .dream{background:#fff3c4;border-radius:12px;padding:8px 10px;margin:6px 0}
+.pcard .secret{border:2px dashed var(--line);border-radius:12px;padding:6px 10px;margin:6px 0;font-size:.95rem}
+.pcard .tag{display:inline-block;background:#e9efff;color:#2a4aa0;border-radius:999px;padding:2px 10px;margin:2px;font-size:.88rem}
+.pcard .lock{color:var(--sub);font-size:.9rem}
+.pcard .real{position:absolute;top:-12px;right:-6px;background:var(--good);color:#fff;font-family:'Jua',sans-serif;padding:4px 14px;border-radius:999px;font-size:1.05rem;box-shadow:0 3px 0 rgba(0,0,0,.2)}
+.pcard .mark{position:absolute;top:10px;left:10px;font-size:1.6rem}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px;margin-top:14px}
+.gcard{cursor:pointer}
+.gcard .pcard{padding:10px}
+.gcard .nm{font-size:1.25rem}
+.badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.85rem;background:#eee;margin-left:4px}
+.badge.red{background:#ffe3e8;color:#a61e4d} .badge.green{background:#d3f9e0;color:#1b7a43} .badge.blue{background:#e3edff;color:#2a4aa0} .badge.orange{background:#ffe8cc;color:#b84b00}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.tabs button{font:inherit;font-family:'Jua',sans-serif;border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 14px;cursor:pointer}
+.tabs button.on{background:var(--main);color:#fff;border-color:var(--main)}
+table.t{width:100%;border-collapse:collapse;font-size:.95rem;background:#fff}
+table.t th,table.t td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+table.t th{background:#eef2fa}
+.modal{position:fixed;inset:0;background:rgba(30,25,20,.55);z-index:20;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px}
+.modal .box{background:var(--bg);border-radius:20px;max-width:760px;width:100%;padding:16px;margin:auto}
+.split{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:18px}
+@media(max-width:700px){.split{grid-template-columns:1fr}}
+.worry{border-left:6px solid var(--line);padding:10px 12px;margin:10px 0;background:#fff;border-radius:10px}
+.worry.need{border-left-color:var(--bad);background:#fff5f7}
+.worry.flag{border-left-color:var(--warn);background:#fff8f0}
+mark{background:#ffd8a8;padding:0 2px;border-radius:3px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:999px;z-index:50;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+.reveal-stage{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}
+.reveal-stage .pcard{width:min(88vw,380px);transition:transform .5s}
+.reveal-stage .pcard.flip{animation:flip .6s}
+@keyframes flip{0%{transform:rotateY(90deg)}100%{transform:rotateY(0)}}
+.reveal-stage .realname{font-family:'Jua',sans-serif;font-size:2.6rem;color:var(--good)}
+.hide{display:none!important}
+@media print{
+  body{background:#fff}
+  #app > *:not(#printArea){display:none!important}
+  #printArea{display:block!important}
+  .noprint{display:none!important}
+}
+#printArea{display:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* =====================================================================
+   ★ Firebase 설정 — 콘솔의 [프로젝트 설정 > 내 앱 > 웹 앱] 값을 아래에 붙여 넣으세요.
+   (이 값은 비밀 키가 아니며, 실제 보안은 firestore.rules 가 담당합니다.)
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+const CONFIGURED = !/^YOUR_/.test(firebaseConfig.apiKey);
+let auth = null, db = null;
+if (CONFIGURED) {
+  const fb = initializeApp(firebaseConfig);
+  auth = getAuth(fb); auth.languageCode = 'ko';
+  db = getFirestore(fb);
+}
+
+/* ---------------------------- 상수 ---------------------------- */
+const DEFAULT_CLUES = ["나는 ____을(를) 좋아해요", "쉬는 시간에 주로 ____ 해요", "나를 동물로 표현하면 ____"];
+const DEFAULT_KEYWORDS = ["죽고","죽고싶","자해","때려","맞았","맞고","따돌","왕따","학대","가출","무서워","괴롭"];
+const WORRY_CHIPS = ["숙제·공부","친구 관계","가족","게임·휴대폰 시간","외모·몸","진로·꿈","잠·건강","기타","없음"];
+const DREAM_EMOJIS = ["🌟","🎮","⚽","🎨","🎤","🎬","🧑‍🍳","🧑‍🚀","🧑‍⚕️","👩‍🏫","🧑‍🔬","🐶","🚀","💻","📚","🏆","💰","🌍"];
+const PALETTE = ["#222222","#ffffff","#e03131","#ff922b","#ffd43b","#69db7c","#2f9e44","#74c0fc","#1c7ed6","#9775fa","#f783ac","#a0522d"];
+const STAMPS = ["👀","👁️","👃","👄","👅","😊","😎","🤓","🥺","🎩","👑","🎀","🧢","👓","🕶️","🐱","🐶","🐰","🦊","🐻","🌟","❤️","🌈","🍀","🔥","⚽","🎮","🎧"];
+const PHASES = { writing:"카드 만드는 중", locked:"마감(교생 쌤 열람)", revealed:"정답 공개" };
+const CV = 256;
+
+/* ---------------------------- 헬퍼 ---------------------------- */
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastTimer;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2800); }
+const S = { role:null, classId:null, cls:null, user:null };
+const C = (...p) => doc(db,'classes',S.classId,...p);
+const Col = n => collection(db,'classes',S.classId,n);
+const todayStr = () => new Date().toISOString().slice(0,10);
+function showErr(e){
+  console.error(e);
+  const c = e && e.code || '';
+  if (c.includes('permission-denied')) return toast('권한이 없어요. (등록되지 않았거나 아직 열리지 않았어요)');
+  if (c.includes('network')) return toast('인터넷 연결을 확인해 주세요');
+  if (c==='auth/popup-closed-by-user' || c==='auth/cancelled-popup-request') return toast('로그인 창이 닫혔어요');
+  if (c==='auth/weak-password') return toast('비밀번호는 숫자 6자리로 해 주세요');
+  if (c==='auth/operation-not-allowed') return toast('Firebase 콘솔에서 로그인 방법을 켜 주세요');
+  if (c==='auth/unauthorized-domain') return toast('Firebase 승인된 도메인에 이 주소를 추가해 주세요');
+  toast('앗, 문제가 생겼어요: ' + (e && (e.code||e.message) || e));
+}
+function setTheme(adult){ document.body.classList.toggle('adult', !!adult); }
+function download(name, text, type='application/json'){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+const clueQs = () => (S.cls && S.cls.clueQuestions && S.cls.clueQuestions.length===3) ? S.cls.clueQuestions : DEFAULT_CLUES;
+const kws = () => (S.cls && S.cls.keywords) || DEFAULT_KEYWORDS;
+function highlight(text){
+  let h = esc(text);
+  kws().forEach(k=>{ if(k) h = h.split(esc(k)).join('<mark>'+esc(k)+'</mark>'); });
+  return h;
+}
+const hasKw = t => kws().some(k=>k && String(t||'').includes(k));
+function clueLine(q,a){ return q.includes('____') ? esc(q).replace('____','<b>'+esc(a)+'</b>') : esc(q)+' <b>'+esc(a)+'</b>'; }
+
+function cardHTML(c, o={}){
+  const clues = (c.clues||[]).map((a,i)=> a ? `<li>${clueLine(clueQs()[i]||'',a)}</li>` : '').join('');
+  const shared = c.worryVisibility==='intern';
+  let worry = '';
+  if (o.showWorry !== false) {
+    if (shared && ((c.worryChips||[]).length || c.worryText)) {
+      worry = `<div><b>요즘 고민</b> ${(c.worryChips||[]).filter(x=>x!=='없음').map(x=>`<span class="tag">${esc(x)}</span>`).join('')}${c.worryText?`<div>${esc(c.worryText)}</div>`:''}</div>`;
+    } else worry = `<div class="lock">요즘 고민: 🔒 비공개</div>`;
+  }
+  return `<div class="pcard">
+    ${o.real?`<div class="real">${esc(o.real)}</div>`:''}
+    ${o.mark?`<div class="mark">${o.mark}</div>`:''}
+    ${c.drawing?`<img class="pic" src="${c.drawing}" alt="캐릭터">`:`<div class="pic"></div>`}
+    <div class="nm">${esc(c.anonName||'')}</div>
+    <div class="dream">${esc(c.dreamEmoji||'')} 꿈: ${esc(c.dreamText||'')}</div>
+    ${o.compact?'':`<ul>${clues}</ul>${c.secretHint?`<div class="secret">🔎 비밀 힌트: ${esc(c.secretHint)}</div>`:''}${worry}`}
+  </div>`;
+}
+
+/* ---------------------------- 이벤트 위임 ---------------------------- */
+const actions = {};
+app.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const fn = actions[b.dataset.act];
+  if (fn) Promise.resolve(fn(b,e)).catch(showErr);
+});
+app.addEventListener('input', e => {
+  const k = e.target.dataset && e.target.dataset.bind;
+  if (k && S.draft) setDraft(k, e.target.type==='checkbox' ? e.target.checked : e.target.value);
+});
+app.addEventListener('change', e => {
+  const k = e.target.dataset && e.target.dataset.bind;
+  if (k && S.draft) setDraft(k, e.target.type==='checkbox' ? e.target.checked : e.target.value);
+});
+
+/* =====================================================================
+   시작 화면
+   ===================================================================== */
+function viewStart(){
+  setTheme(false); S.view='start';
+  const last = localStorage.getItem('anoncard:lastClass') || '';
+  app.innerHTML = `<div class="narrow">
+    <div class="hero"><div class="big">🃏</div><h1>익명 카드로 알아가기</h1>
+    <p class="hint">나를 닮은 카드를 만들고,<br>교생 쌤이 “이 카드는 누구일까?” 찾아가는 놀이예요.</p></div>
+    ${CONFIGURED ? '' : `<div class="warn err"><b>Firebase 설정이 아직 없어요.</b><br>index.html 위쪽 <code>firebaseConfig</code> 값을 채우고 다시 배포해 주세요. (README 참고)</div>`}
+    <div class="panel">
+      <label class="f" for="code">학급 코드</label>
+      <input id="code" type="text" inputmode="latin" autocomplete="off" placeholder="선생님이 알려 준 코드" value="${esc(last)}" maxlength="20">
+      <div class="roles">
+        <button class="btn" data-act="start" data-role="student">🎒 나는 학생이에요</button>
+        <button class="btn sub" data-act="start" data-role="intern">🧑‍🏫 교생 쌤</button>
+        <button class="btn sub" data-act="start" data-role="teacher">🍎 담임 쌤</button>
+      </div>
+    </div></div>`;
+}
+actions.start = async (b) => {
+  if (!CONFIGURED) return toast('Firebase 설정이 아직 없어요');
+  const role = b.dataset.role;
+  const code = ($('#code').value||'').trim().toLowerCase();
+  if (!/^[a-z0-9]{3,20}$/.test(code)) return toast('학급 코드는 영어·숫자 3~20자예요');
+  S.classId = code; S.role = role;
+  localStorage.setItem('anoncard:lastClass', code);
+  if (role==='student') return viewStudentLogin();
+  return googleLogin(role);
+};
+async function loadClass(){
+  const s = await getDoc(doc(db,'classes',S.classId));
+  S.cls = s.exists() ? s.data() : null;
+  return S.cls;
+}
+
+/* =====================================================================
+   학생: 로그인
+   ===================================================================== */
+async function viewStudentLogin(){
+  if (!await loadClass()) return toast('없는 학급 코드예요. 코드를 다시 확인해 주세요');
+  setTheme(false); S.view='stuLogin';
+  app.innerHTML = `<div class="narrow"><div class="panel">
+    <h2>🎒 내 번호로 들어가기</h2>
+    <label class="f" for="num">내 번호</label>
+    <input id="num" type="number" min="1" max="99" inputmode="numeric" placeholder="예: 7">
+    <label class="f" for="pin">비밀번호 (숫자 6자리)</label>
+    <input id="pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+    <p class="hint">처음이면 지금 정한 숫자가 내 비밀번호가 돼요. <b>꼭 기억해 두세요!</b></p>
+    <div class="row"><button class="btn good grow" data-act="stuLogin">들어가기</button><button class="btn sub" data-act="home">처음으로</button></div>
+  </div></div>`;
+}
+actions.home = () => { if(auth) signOut(auth).catch(()=>{}); S.draft=null; viewStart(); };
+actions.stuLogin = async () => {
+  const num = parseInt($('#num').value,10), pin = ($('#pin').value||'').trim();
+  if (!(num>=1 && num<=99)) return toast('번호를 숫자로 써 주세요');
+  if (!/^\d{6}$/.test(pin)) return toast('비밀번호는 숫자 6자리예요');
+  const ver = (S.cls.pinVer||{})[num] || 0;
+  const email = `${S.classId}-${num}-v${ver}@card.app`;
+  try { await signInWithEmailAndPassword(auth,email,pin); }
+  catch(e){
+    if (['auth/invalid-credential','auth/user-not-found','auth/invalid-login-credentials'].includes(e.code)) {
+      if (!confirm(`${num}번으로 처음 시작할까요?\n(이미 만든 적이 있다면 비밀번호가 달라서 그런 거예요. 그땐 [취소])`)) return;
+      try { await createUserWithEmailAndPassword(auth,email,pin); }
+      catch(e2){ if (e2.code==='auth/email-already-in-use') return toast('비밀번호가 달라요. 기억이 안 나면 선생님께 말씀드려요'); throw e2; }
+    } else throw e;
+  }
+  S.user = auth.currentUser; S.num = num;
+  await loadMyCard();
+};
+async function loadMyCard(){
+  const s = await getDocs(query(Col('cards'), where('ownerUid','==',S.user.uid)));
+  S.cardId=null; S.card=null; S.priv=null;
+  if (!s.empty) {
+    const d = s.docs[0]; S.cardId = d.id; S.card = d.data();
+    try { const p = await getDoc(C('private',d.id)); S.priv = p.exists()?p.data():{}; } catch(e){ S.priv={}; }
+  }
+  await loadClass();
+  viewStudentHome();
+}
+
+/* =====================================================================
+   학생: 홈
+   ===================================================================== */
+function viewStudentHome(){
+  setTheme(false); S.view='stuHome'; S.draft=null;
+  const ph = (S.cls&&S.cls.phase)||'writing';
+  const canEdit = ph==='writing';
+  app.innerHTML = `<div class="narrow">
+    <div class="row between"><h2>${S.num}번 친구, 안녕!</h2><button class="btn sub small" data-act="home">나가기</button></div>
+    ${S.card ? `
+      <div class="panel ok"><b>카드를 냈어요! 🎉</b><br>${canEdit?'마감 전까지 고칠 수 있어요.':'카드를 만드는 시간이 끝났어요.'}</div>
+      ${S.card.hidden?`<div class="warn">선생님이 카드를 잠시 숨겼어요. 선생님과 이야기해 봐요.</div>`:''}
+      ${cardHTML(S.card,{showWorry:false})}
+      <div class="row" style="margin-top:14px">${canEdit?`<button class="btn" data-act="wizard">✏️ 카드 고치기</button>`:''}</div>
+    ` : `
+      <div class="panel hero"><div class="big">✨</div><h3>아직 카드가 없어요</h3>
+      <p>익명 이름, 캐릭터 그림, 꿈, 고민, 나를 찾을 단서를 적어요.<br>약 20~30분 걸려요.</p>
+      ${canEdit?`<button class="btn" data-act="wizard">카드 만들기 시작!</button>`:`<p class="warn">카드 만드는 시간이 끝났어요.</p>`}</div>`}
+  </div>`;
+}
+
+/* =====================================================================
+   학생: 카드 만들기 마법사
+   ===================================================================== */
+const draftKey = () => `anoncard:draft:${S.classId}:${S.num}`;
+function blankDraft(){ return {anonName:'',drawing:'',dreamText:'',dreamEmoji:'🌟',worryChips:[],worryText:'',worryVisibility:'teacher',wantsTalk:false,clues:['','',''],secretHint:''}; }
+function setDraft(k,v){
+  const d=S.draft;
+  if (k.startsWith('clue')) d.clues[+k.slice(4)] = v; else d[k]=v;
+  saveDraft();
+  if (k==='anonName') liveNameCheck();
+}
+function saveDraft(){ try{ localStorage.setItem(draftKey(), JSON.stringify(S.draft)); }catch(e){} }
+actions.wizard = () => {
+  let d = blankDraft();
+  if (S.card) {
+    const c=S.card, p=S.priv||{};
+    d = { anonName:c.anonName, drawing:c.drawing||'', dreamText:c.dreamText||'', dreamEmoji:c.dreamEmoji||'🌟',
+      worryChips:p.worryChips||c.worryChips||[], worryText:p.worryText||c.worryText||'',
+      worryVisibility:p.worryVisibility||c.worryVisibility||'teacher', wantsTalk:!!p.wantsTalk,
+      clues:(c.clues||['','','']).concat(['','','']).slice(0,3), secretHint:c.secretHint||'' };
+  } else {
+    try { const saved = JSON.parse(localStorage.getItem(draftKey())||'null'); if (saved) d = Object.assign(d, saved); } catch(e){}
+  }
+  S.draft = d; S.step = 1; viewWizard();
+};
+function stepBar(){ return `<div class="progress">${[1,2,3,4,5,6].map(i=>`<i class="${i<=S.step?'on':''}"></i>`).join('')}</div>`; }
+function viewWizard(){
+  S.view='wizard'; const d=S.draft, st=S.step;
+  let body='';
+  if (st===1) body = `
+    <h2>① 익명 이름 짓기</h2>
+    <p class="hint">친구들이 알아볼 수 있는 진짜 이름·별명·번호는 쓰지 않아요. 최대 5글자! (예: 별똥별, 초코칩)</p>
+    <input id="nameIn" type="text" data-bind="anonName" maxlength="12" value="${esc(d.anonName)}" placeholder="익명 이름" autocomplete="off">
+    <div id="nameMsg" class="hint" style="margin-top:6px">&nbsp;</div>`;
+  if (st===2) body = `
+    <h2>② 나를 닮은 캐릭터 그리기</h2>
+    <p class="hint">잘 그리지 않아도 괜찮아요! 스탬프로 눈·코·입을 붙여도 돼요. 글자로 이름을 쓰지는 않아요.</p>
+    <div class="board-wrap">
+      <canvas id="cv" width="${CV}" height="${CV}"></canvas>
+      <div class="tools">
+        <div class="toolbtns">
+          <button class="btn sub" data-act="tool" data-tool="pen" id="tPen">🖊️ 펜</button>
+          <button class="btn sub" data-act="tool" data-tool="eraser" id="tEraser">🧽 지우개</button>
+          <button class="btn sub" data-act="tool" data-tool="stamp" id="tStamp">😀 스탬프</button>
+          <button class="btn sub" data-act="tool" data-tool="bg" id="tBg">🪣 배경색</button>
+        </div>
+        <div class="swatches">${PALETTE.map((c,i)=>`<button class="sw" data-act="color" data-c="${c}" style="background:${c}" aria-label="색 ${i+1}"></button>`).join('')}</div>
+        <div class="toolbtns">
+          <button class="btn sub small" data-act="size" data-s="3">가늘게</button>
+          <button class="btn sub small" data-act="size" data-s="8">보통</button>
+          <button class="btn sub small" data-act="size" data-s="16">굵게</button>
+        </div>
+        <div id="stampBox" class="hide">
+          <div class="stamps">${STAMPS.map(s=>`<button data-act="stampPick" data-s="${s}">${s}</button>`).join('')}</div>
+          <label class="f">스탬프 크기</label>
+          <input type="range" id="stSize" min="24" max="150" value="64">
+          <div class="hint">캔버스를 누른 채 움직이면 자리를 옮길 수 있어요. 손을 떼면 붙어요.</div>
+        </div>
+        <div class="toolbtns">
+          <button class="btn sub" data-act="undo">↩️ 되돌리기</button>
+          <button class="btn sub" data-act="clearCv">🗑️ 모두 지우기</button>
+        </div>
+      </div>
+    </div>`;
+  if (st===3) body = `
+    <h2>③ 나의 꿈</h2>
+    <label class="f">꿈을 한 줄로 (30자까지)</label>
+    <input type="text" data-bind="dreamText" maxlength="30" value="${esc(d.dreamText)}" placeholder="예: 게임 만드는 사람">
+    <label class="f">꿈을 닮은 그림 하나</label>
+    <div class="chips">${DREAM_EMOJIS.map(e=>`<button class="chip emoji-chip ${d.dreamEmoji===e?'on':''}" data-act="dreamEmoji" data-e="${e}">${e}</button>`).join('')}</div>`;
+  if (st===4) body = `
+    <h2>④ 요즘 고민</h2>
+    <p class="hint">가벼운 고민(숙제, 친구랑 놀기, 게임 시간)부터 써도 돼요. 쓰고 싶지 않으면 건너뛰어도 괜찮아요.</p>
+    <div class="chips">${WORRY_CHIPS.map(w=>`<button class="chip ${d.worryChips.includes(w)?'on':''}" data-act="worryChip" data-w="${esc(w)}">${esc(w)}</button>`).join('')}</div>
+    <label class="f">더 쓰고 싶은 말 (100자까지, 선택)</label>
+    <textarea data-bind="worryText" maxlength="100" placeholder="쓰고 싶은 만큼만 써요">${esc(d.worryText)}</textarea>
+    <label class="f">누구에게 알려 줄까요?</label>
+    ${[['teacher','🔒 담임 선생님에게만 알려줄래요'],['intern','👀 교생 선생님께도 알려줄래요'],['none','🙅 쓰지 않을래요']].map(([v,t])=>`
+      <label style="display:block;margin:6px 0"><input type="radio" name="vis" data-bind="worryVisibility" value="${v}" ${d.worryVisibility===v?'checked':''}> ${t}</label>`).join('')}
+    <label style="display:block;margin-top:12px"><input type="checkbox" data-bind="wantsTalk" ${d.wantsTalk?'checked':''}> 담임 선생님과 따로 이야기하고 싶어요</label>`;
+  if (st===5) body = `
+    <h2>⑤ 나를 찾을 단서</h2>
+    <p class="hint">교생 쌤이 단서로 나를 찾아요. 너무 쉽지도, 너무 어렵지도 않게!<br><b>쓰면 안 돼요:</b> 이름·초성, 번호, 앉은 자리, 외모(키·안경 등), 가족 이름</p>
+    ${clueQs().map((q,i)=>`<label class="f">${esc(q)}</label><input type="text" data-bind="clue${i}" maxlength="30" value="${esc(d.clues[i])}" placeholder="빈칸에 들어갈 말">`).join('')}
+    <label class="f">비밀 힌트 (선택, 40자까지)</label>
+    <input type="text" data-bind="secretHint" maxlength="40" value="${esc(d.secretHint)}" placeholder="찾기 어려우면 이걸 보세요!">
+    <div id="clueWarn"></div>`;
+  if (st===6) {
+    const preview = { anonName:d.anonName, drawing:d.drawing, dreamText:d.dreamText, dreamEmoji:d.dreamEmoji, clues:d.clues, secretHint:d.secretHint,
+      worryVisibility:d.worryVisibility, worryChips:d.worryVisibility==='intern'?d.worryChips:[], worryText:d.worryVisibility==='intern'?d.worryText:'' };
+    body = `<h2>⑥ 미리보기</h2><p class="hint">교생 쌤에게는 이렇게 보여요. 괜찮으면 [제출하기]!</p><div style="max-width:320px;margin:0 auto">${cardHTML(preview)}</div>`;
+  }
+  app.innerHTML = `<div class="narrow">
+    <div class="row between"><span class="hint">${S.num}번</span><button class="btn sub small" data-act="wizardExit">나가기</button></div>
+    ${stepBar()}
+    <div class="panel">${body}</div>
+    <div class="row between">
+      <button class="btn sub" data-act="prev" ${st===1?'disabled':''}>← 이전</button>
+      ${st<6 ? `<button class="btn" data-act="next">다음 →</button>` : `<button class="btn good" data-act="submit">🎉 제출하기</button>`}
+    </div></div>`;
+  if (st===2) initCanvas();
+  if (st===1) liveNameCheck();
+}
+actions.wizardExit = () => { if (S.step===2) grabDrawing(); saveDraft(); viewStudentHome(); };
+actions.dreamEmoji = b => { S.draft.dreamEmoji = b.dataset.e; saveDraft(); viewWizard(); };
+actions.worryChip = b => {
+  const w=b.dataset.w, a=S.draft.worryChips, i=a.indexOf(w);
+  if (i>=0) a.splice(i,1); else { if (w==='없음') a.length=0; else { const j=a.indexOf('없음'); if(j>=0)a.splice(j,1); } a.push(w); }
+  saveDraft(); viewWizard();
+};
+function validName(n){
+  const arr = Array.from(n);
+  if (arr.length<1 || arr.length>5) return '이름은 1~5글자로 지어 주세요';
+  if (/[\/\\.\s]/.test(n)) return '띄어쓰기, 점(.), 슬래시는 쓸 수 없어요';
+  if (/^\d+$/.test(n)) return '숫자만으로는 지을 수 없어요 (번호가 드러날 수 있어요)';
+  return '';
+}
+let nameTimer;
+function liveNameCheck(){
+  const msg = $('#nameMsg'); if (!msg) return;
+  const n = (S.draft.anonName||'').trim();
+  clearTimeout(nameTimer);
+  if (!n) { msg.innerHTML='&nbsp;'; return; }
+  const v = validName(n); if (v) { msg.textContent = '⚠️ '+v; return; }
+  msg.textContent = '확인하는 중…';
+  nameTimer = setTimeout(async()=>{
+    try { const taken = await nameTaken(n); const m=$('#nameMsg'); if(m) m.textContent = taken ? '😢 이미 쓰고 있는 친구가 있어요' : '😊 쓸 수 있는 이름이에요!'; }
+    catch(e){ const m=$('#nameMsg'); if(m) m.textContent=''; }
+  },400);
+}
+async function nameTaken(n){
+  const s = await getDoc(C('anonNames', n.toLowerCase()));
+  return s.exists() && s.data().ownerUid !== S.user.uid;
+}
+actions.prev = () => { if (S.step===2) grabDrawing(); S.step--; viewWizard(); };
+actions.next = async () => {
+  const d=S.draft, st=S.step;
+  if (st===1) {
+    d.anonName = (d.anonName||'').trim();
+    const v = validName(d.anonName); if (v) return toast(v);
+    if (await nameTaken(d.anonName)) return toast('이미 쓰고 있는 이름이에요. 다른 이름을 지어요');
+  }
+  if (st===2) { grabDrawing(); if (!d.drawing || !inkDrawn) return toast('캐릭터를 그려 주세요! (스탬프도 좋아요)'); }
+  if (st===3 && !(d.dreamText||'').trim()) return toast('꿈을 한 줄 적어 주세요');
+  if (st===4 && d.worryVisibility==='none') { d.worryChips=[]; d.worryText=''; d.wantsTalk=d.wantsTalk; }
+  if (st===5) {
+    if (d.clues.filter(x=>x.trim()).length<2) return toast('단서를 두 개 이상 써 주세요');
+    const all = d.clues.join(' ')+' '+d.secretHint;
+    if (/(번호|자리|안경|초성|키가|[0-9]{1,2}번)/.test(all) && !confirm('쓰면 안 되는 단서(번호·자리·외모·초성)가 들어 있는 것 같아요. 그대로 갈까요?')) return;
+  }
+  saveDraft(); S.step++; viewWizard();
+};
+actions.submit = async () => {
+  const d = S.draft;
+  const btn = document.querySelector('[data-act=submit]'); if (btn) btn.disabled = true;
+  try {
+    if (await nameTaken(d.anonName)) { if(btn)btn.disabled=false; return toast('그 사이에 다른 친구가 이름을 썼어요. 이름을 바꿔 주세요'); }
+    const uid = S.user.uid, id = S.cardId || doc(Col('cards')).id;
+    const nameKey = d.anonName.toLowerCase(), oldKey = S.card ? S.card.anonName.toLowerCase() : null;
+    const shared = d.worryVisibility==='intern';
+    const batch = writeBatch(db);
+    if (oldKey && oldKey!==nameKey) batch.delete(C('anonNames',oldKey));
+    if (oldKey!==nameKey) batch.set(C('anonNames',nameKey),{ownerUid:uid});
+    batch.set(C('cards',id),{
+      ownerUid:uid, anonName:d.anonName, drawing:d.drawing, dreamText:d.dreamText.trim(), dreamEmoji:d.dreamEmoji,
+      clues:d.clues.map(x=>x.trim()), secretHint:d.secretHint.trim(),
+      worryVisibility:d.worryVisibility, worryChips:shared?d.worryChips:[], worryText:shared?d.worryText.trim():'',
+      hidden: S.card ? !!S.card.hidden : false, submittedAt: serverTimestamp()
+    });
+    batch.set(C('private',id),{
+      ownerUid:uid, num:S.num, worryVisibility:d.worryVisibility,
+      worryChips:d.worryVisibility==='none'?[]:d.worryChips, worryText:d.worryVisibility==='none'?'':d.worryText.trim(), wantsTalk:!!d.wantsTalk
+    });
+    await batch.commit();
+    try{ localStorage.removeItem(draftKey()); }catch(e){}
+    await loadMyCard();
+    toast('카드를 냈어요! 🎉');
+  } catch(e){ if(btn)btn.disabled=false; throw e; }
+};
+
+/* ---------------------------- 그림판 ---------------------------- */
+let cvx, tool='pen', color='#222222', size=8, stamp='😊', snaps=[], inkDrawn=false, stampBase=null, drawing=false, last=null;
+function initCanvas(){
+  const cv = $('#cv'); cvx = cv.getContext('2d'); cvx.lineCap='round'; cvx.lineJoin='round';
+  snaps = []; inkDrawn = false; tool='pen';
+  const restore = () => {
+    if (!S.draft.drawing) return;
+    const img = new Image(); img.onload = ()=>{ cvx.drawImage(img,0,0,CV,CV); inkDrawn=true; }; img.src = S.draft.drawing;
+  };
+  restore();
+  const pos = e => { const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*CV/r.width, y:(e.clientY-r.top)*CV/r.height}; };
+  cv.onpointerdown = e => {
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    pushSnap(); drawing=true; const p=pos(e); last=p;
+    if (tool==='bg') { cvx.globalCompositeOperation='destination-over'; cvx.fillStyle=color; cvx.fillRect(0,0,CV,CV); cvx.globalCompositeOperation='source-over'; inkDrawn=true; drawing=false; return; }
+    if (tool==='stamp') { stampBase = cvx.getImageData(0,0,CV,CV); drawStamp(p); return; }
+    cvx.globalCompositeOperation = tool==='eraser' ? 'destination-out' : 'source-over';
+    cvx.strokeStyle = color; cvx.fillStyle = color; cvx.lineWidth = tool==='eraser' ? size*1.6 : size;
+    cvx.beginPath(); cvx.arc(p.x,p.y,cvx.lineWidth/2,0,Math.PI*2); cvx.fill();
+    if (tool==='pen') inkDrawn = true;
+  };
+  cv.onpointermove = e => {
+    if (!drawing) return; e.preventDefault(); const p=pos(e);
+    if (tool==='stamp') { cvx.putImageData(stampBase,0,0); drawStamp(p); return; }
+    cvx.beginPath(); cvx.moveTo(last.x,last.y); cvx.lineTo(p.x,p.y); cvx.stroke(); last=p;
+  };
+  const end = e => { if (!drawing) return; drawing=false; cvx.globalCompositeOperation='source-over'; if (tool==='stamp') inkDrawn=true; };
+  cv.onpointerup = end; cv.onpointercancel = end;
+  markTool();
+}
+function drawStamp(p){
+  const s = +($('#stSize')||{value:64}).value;
+  cvx.globalCompositeOperation='source-over';
+  cvx.font = `${s}px "Apple Color Emoji","Noto Color Emoji","Segoe UI Emoji",sans-serif`;
+  cvx.textAlign='center'; cvx.textBaseline='middle'; cvx.fillText(stamp,p.x,p.y);
+}
+function pushSnap(){ snaps.push(cvx.getImageData(0,0,CV,CV)); if (snaps.length>20) snaps.shift(); }
+function markTool(){
+  ['Pen','Eraser','Stamp','Bg'].forEach(n=>{ const b=$('#t'+n); if(b) b.classList.toggle('on', tool===n.toLowerCase()); });
+  const sb=$('#stampBox'); if (sb) sb.classList.toggle('hide', tool!=='stamp');
+  document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('on', s.dataset.c===color));
+  document.querySelectorAll('[data-act=stampPick]').forEach(s=>s.classList.toggle('on', s.dataset.s===stamp));
+}
+actions.tool = b => { tool=b.dataset.tool; markTool(); };
+actions.color = b => { color=b.dataset.c; if (tool==='eraser'||tool==='stamp') tool='pen'; markTool(); };
+actions.size = b => { size=+b.dataset.s; if (tool!=='pen'&&tool!=='eraser') tool='pen'; markTool(); };
+actions.stampPick = b => { stamp=b.dataset.s; tool='stamp'; markTool(); };
+actions.undo = () => { const s=snaps.pop(); if (!s) return toast('더 되돌릴 게 없어요'); cvx.putImageData(s,0,0); };
+actions.clearCv = () => { if (!confirm('그림을 모두 지울까요?')) return; pushSnap(); cvx.clearRect(0,0,CV,CV); inkDrawn=false; };
+function grabDrawing(){
+  if (!cvx || !$('#cv')) return;
+  const out = document.createElement('canvas'); out.width=CV; out.height=CV;
+  const o = out.getContext('2d'); o.fillStyle='#fff'; o.fillRect(0,0,CV,CV); o.drawImage($('#cv'),0,0);
+  let q = 0.8, url = '';
+  for (let i=0;i<5;i++){ url = out.toDataURL('image/webp', q); if (url.length < 90000) break; q -= 0.15; }
+  if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/jpeg', 0.7);
+  S.draft.drawing = inkDrawn ? url : '';
+  saveDraft();
+}
+
+/* =====================================================================
+   구글 로그인 (담임·교생)
+   ===================================================================== */
+async function googleLogin(role){
+  const res = await signInWithPopup(auth, new GoogleAuthProvider());
+  S.user = res.user;
+  const cls = await loadClass();
+  if (role==='teacher') {
+    if (!cls) {
+      if (!confirm(`'${S.classId}' 학급이 아직 없어요. 새 학급으로 만들까요?`)) return;
+      await setDoc(doc(db,'classes',S.classId), { teacherUid:S.user.uid, phase:'writing', deadline:'', clueQuestions:DEFAULT_CLUES, keywords:DEFAULT_KEYWORDS, pinVer:{}, createdAt:serverTimestamp() });
+      await setDoc(C('config','access'), { internEmails:[] });
+      await loadClass();
+    } else if (cls.teacherUid !== S.user.uid) return toast('이 학급의 담임 계정이 아니에요');
+    return viewTeacher();
+  }
+  if (!cls) return toast('없는 학급 코드예요');
+  if (cls.phase==='writing') return toast('아직 아이들이 카드를 만드는 중이에요. 마감 후에 열려요');
+  return viewIntern();
+}
+
+/* =====================================================================
+   교생 쌤
+   ===================================================================== */
+async function loadIntern(){
+  const [cs, ns] = await Promise.all([
+    getDocs(query(Col('cards'), where('hidden','==',false))),
+    getDocs(query(Col('internNotes'), where('internUid','==',S.user.uid)))
+  ]);
+  S.cards = cs.docs.map(d=>({id:d.id, ...d.data()}));
+  S.notes = {}; ns.docs.forEach(d=>{ const n=d.data(); S.notes[n.cardId]=n; });
+  S.reveals = {};
+  if (S.cls.phase==='revealed') { try { (await getDocs(Col('reveals'))).docs.forEach(d=>S.reveals[d.id]=d.data().realName); } catch(e){} }
+}
+async function viewIntern(){
+  setTheme(true); S.view='intern';
+  try { await loadClass(); await loadIntern(); } catch(e){
+    if ((e.code||'').includes('permission')) return toast('교생 쌤으로 등록된 구글 계정이 아니에요. 담임 선생님께 이메일 등록을 부탁해요');
+    throw e;
+  }
+  S.fq = S.fq || '';
+  renderIntern();
+}
+function noteDone(id){ const n=S.notes[id]; return n && (n.guess || (n.observations||[]).length); }
+function renderIntern(){
+  const rev = S.cls.phase==='revealed';
+  let list = S.cards.slice().sort((a,b)=>a.anonName.localeCompare(b.anonName,'ko'));
+  const q = (S.fq||'').trim();
+  if (q) list = list.filter(c => [c.anonName,c.dreamText,c.secretHint,...(c.clues||[]),...(c.worryChips||[]),c.worryText].join(' ').includes(q));
+  if (S.fOnlyNew) list = list.filter(c=>!noteDone(c.id));
+  const done = S.cards.filter(c=>noteDone(c.id)).length;
+  app.innerHTML = `
+  <div class="row between"><h2>🧑‍🏫 교생 쌤 카드 갤러리</h2><div class="row"><button class="btn sub small" data-act="internNotes">📒 내 노트 모아보기</button><button class="btn sub small" data-act="home">나가기</button></div></div>
+  <div class="panel">
+    <b>이렇게 해 주세요</b>
+    <ul style="margin:6px 0 0;padding-left:20px">
+      <li>고민 내용을 아이에게 직접 캐묻지 않아요.</li>
+      <li>카드 내용을 다른 아이들 앞에서 말하지 않아요.</li>
+      <li>맞히기는 놀이예요. 틀려도 괜찮은 분위기로, 그림을 평가하지 않아요.</li>
+    </ul>
+  </div>
+  <div class="row"><input type="text" id="fq" placeholder="검색 (꿈, 좋아하는 것, 고민 등)" value="${esc(S.fq||'')}" style="max-width:340px">
+    <label><input type="checkbox" id="fnew" ${S.fOnlyNew?'checked':''}> 메모 안 한 카드만</label>
+    <span class="hint">${S.cards.length}장 중 ${done}장 메모함 · ${PHASES[S.cls.phase]}</span>
+    <button class="btn sub small" data-act="refreshIntern">🔄 새로고침</button></div>
+  <div class="gallery">${list.map(c=>{
+      const n=S.notes[c.id]; let mark='';
+      if (rev && n && n.guess && S.reveals[c.id]) mark = isRight(n.guess,S.reveals[c.id])?'⭕':'❌';
+      else if (n && n.guess) mark='📝';
+      return `<div class="gcard" data-act="openCard" data-id="${c.id}">${cardHTML(c,{compact:true,mark,real:rev?S.reveals[c.id]:''})}</div>`;
+    }).join('') || '<p class="hint">조건에 맞는 카드가 없어요.</p>'}</div>`;
+  const fq=$('#fq'); fq.oninput = e=>{ S.fq=e.target.value; clearTimeout(S._t); S._t=setTimeout(()=>{renderIntern(); const f=$('#fq'); f.focus(); f.setSelectionRange(f.value.length,f.value.length);},350); };
+  $('#fnew').onchange = e=>{ S.fOnlyNew=e.target.checked; renderIntern(); };
+}
+const norm = s => String(s||'').replace(/\s/g,'');
+function isRight(guess, real){ const g=norm(guess), r=norm(real); return !!g && !!r && (g===r || r.includes(g) || g.includes(r)); }
+actions.refreshIntern = async () => { await loadClass(); await loadIntern(); renderIntern(); toast('새로 불러왔어요'); };
+actions.openCard = b => {
+  const c = S.cards.find(x=>x.id===b.dataset.id); if(!c) return;
+  const n = S.notes[c.id] || {guess:'',confidence:1,status:'guessing',observations:[],sharedWithTeacher:false};
+  const rev = S.cls.phase==='revealed', real = S.reveals[c.id];
+  S.openId = c.id;
+  const m = document.createElement('div'); m.className='modal'; m.id='modal';
+  m.innerHTML = `<div class="box"><div class="row between"><h3>카드 자세히 보기</h3><button class="btn sub small" data-act="closeModal">닫기 ✕</button></div>
+   <div class="split"><div>${cardHTML(c,{real:rev?real:''})}</div>
+   <div>
+     <div class="panel">
+       <h3>🔍 내 추측 <span class="hint">(나만 볼 수 있어요)</span></h3>
+       <label class="f">이 아이일 것 같아요</label><input type="text" id="mGuess" value="${esc(n.guess)}" placeholder="학생 이름">
+       <div class="row"><div class="grow"><label class="f">확신도</label><select id="mConf">${[1,2,3].map(i=>`<option value="${i}" ${+n.confidence===i?'selected':''}>${'★'.repeat(i)}${'☆'.repeat(3-i)}</option>`).join('')}</select></div>
+       <div class="grow"><label class="f">상태</label><select id="mStatus">${[['guessing','추측 중'],['sure','확신'],['confirmed','정답 확인됨']].map(([v,t])=>`<option value="${v}" ${n.status===v?'selected':''}>${t}</option>`).join('')}</select></div></div>
+       ${rev && real ? `<div class="warn ${isRight(n.guess,real)?'ok':'err'}" style="margin-top:10px">정답: <b>${esc(real)}</b> — ${n.guess?(isRight(n.guess,real)?'맞혔어요! ⭕':'아쉬워요 ❌'):'추측을 안 남겼어요'}</div>`:''}
+     </div>
+     <div class="panel">
+       <h3>📝 관찰 노트 <span class="hint">(나만 볼 수 있어요)</span></h3>
+       <div id="obsList">${(n.observations||[]).map(o=>`<div class="worry"><span class="hint">${esc(o.date)}</span><br>${esc(o.text)}</div>`).join('') || '<p class="hint">아직 기록이 없어요.</p>'}</div>
+       <textarea id="mObs" placeholder="대화 내용, 학생 반응, 상담 때 참고할 점…"></textarea>
+       <label style="display:block;margin-top:8px"><input type="checkbox" id="mShare" ${n.sharedWithTeacher?'checked':''}> 이 카드의 노트를 담임 선생님께 공유</label>
+     </div>
+     <button class="btn good" data-act="saveNote">💾 저장하기</button>
+   </div></div></div>`;
+  document.body.appendChild(m);
+};
+actions.closeModal = () => { const m=$('#modal'); if(m) m.remove(); };
+actions.saveNote = async () => {
+  const id = S.openId, old = S.notes[id] || {observations:[]};
+  const obs = (old.observations||[]).slice(); const t = ($('#mObs').value||'').trim();
+  if (t) obs.push({date:todayStr(), text:t});
+  const note = { internUid:S.user.uid, cardId:id, guess:($('#mGuess').value||'').trim(), confidence:+$('#mConf').value, status:$('#mStatus').value,
+    observations:obs, sharedWithTeacher:$('#mShare').checked, updatedAt:serverTimestamp() };
+  await setDoc(C('internNotes', S.user.uid+'_'+id), note);
+  S.notes[id] = note; actions.closeModal(); renderIntern(); toast('저장했어요');
+};
+actions.internNotes = () => {
+  const rev = S.cls.phase==='revealed';
+  const rows = S.cards.filter(c=>S.notes[c.id]).sort((a,b)=>a.anonName.localeCompare(b.anonName,'ko')).map(c=>{
+    const n=S.notes[c.id], real=S.reveals[c.id];
+    const res = rev&&real&&n.guess ? (isRight(n.guess,real)?'⭕':'❌') : '';
+    return `<tr><td>${esc(c.anonName)}</td><td>${esc(n.guess)} ${'★'.repeat(n.confidence||1)}</td><td>${rev&&real?esc(real)+' '+res:'-'}</td><td>${(n.observations||[]).map(o=>esc(o.date)+' '+esc(o.text)).join('<br>')}</td></tr>`;
+  }).join('');
+  const right = rev ? S.cards.filter(c=>S.notes[c.id]&&S.notes[c.id].guess&&S.reveals[c.id]&&isRight(S.notes[c.id].guess,S.reveals[c.id])).length : 0;
+  const tried = rev ? S.cards.filter(c=>S.notes[c.id]&&S.notes[c.id].guess).length : 0;
+  app.innerHTML = `<div class="row between noprint"><h2>📒 내 추측·관찰 노트</h2><div class="row"><button class="btn small" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button><button class="btn sub small" data-act="backIntern">← 갤러리</button></div></div>
+   <div class="panel noprint hint">이 노트는 나만 볼 수 있어요. 인쇄 창에서 “PDF로 저장”을 고르면 실습 기록으로 쓸 수 있어요.${rev?`<br>추측 정확도: ${right} / ${tried}`:''}</div>
+   <div id="printArea" style="display:block"><h2 style="display:none" class="pt">익명 카드 활동 – 교생 노트</h2>
+   <table class="t"><tr><th>익명 이름</th><th>내 추측</th><th>정답</th><th>관찰 노트</th></tr>${rows||'<tr><td colspan="4">아직 노트가 없어요.</td></tr>'}</table></div>
+   <div class="noprint" style="margin-top:14px"><button class="btn bad small" data-act="delMyNotes">내 노트 전부 삭제</button></div>`;
+};
+actions.backIntern = () => renderIntern();
+actions.delMyNotes = async () => {
+  if (!confirm('내 노트를 모두 삭제할까요? 되돌릴 수 없어요.')) return;
+  for (const id of Object.keys(S.notes)) await deleteDoc(C('internNotes', S.user.uid+'_'+id));
+  S.notes = {}; toast('삭제했어요'); renderIntern();
+};
+
+/* =====================================================================
+   담임 쌤
+   ===================================================================== */
+async function loadTeacher(){
+  const [cs, ps, rs, ac, ns] = await Promise.all([
+    getDocs(Col('cards')), getDocs(Col('private')), getDocs(Col('roster')),
+    getDoc(C('config','access')),
+    getDocs(query(Col('internNotes'), where('sharedWithTeacher','==',true)))
+  ]);
+  S.cards = cs.docs.map(d=>({id:d.id,...d.data()}));
+  S.privs = {}; ps.docs.forEach(d=>S.privs[d.id]=d.data());
+  S.roster = {}; rs.docs.forEach(d=>S.roster[d.id]=d.data().realName);
+  S.access = ac.exists()?ac.data():{internEmails:[]};
+  S.sharedNotes = ns.docs.map(d=>d.data());
+}
+async function viewTeacher(tab){
+  setTheme(true); S.view='teacher'; S.tab = tab || S.tab || 'settings';
+  await loadClass(); await loadTeacher(); renderTeacher();
+}
+const numOf = c => (S.privs[c.id]||{}).num;
+const nameOf = n => S.roster[String(n)] || '';
+function renderTeacher(){
+  const tabs = [['settings','⚙️ 설정'],['status','📋 제출 현황'],['worry','💭 고민 원문'],['reveal','🎁 정답 공개'],['notes','📒 교생 노트']];
+  const need = S.cards.filter(c=>(S.privs[c.id]||{}).wantsTalk).length;
+  app.innerHTML = `
+  <div class="row between"><h2>🍎 담임 대시보드 <span class="badge blue">${esc(S.classId)}</span> <span class="badge orange">${PHASES[S.cls.phase]}</span></h2>
+    <div class="row"><button class="btn sub small" data-act="reloadTeacher">🔄</button><button class="btn sub small" data-act="home">나가기</button></div></div>
+  <div class="tabs">${tabs.map(([k,t])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-t="${k}">${t}${k==='worry'&&need?` <span class="badge red">${need}</span>`:''}</button>`).join('')}</div>
+  <div id="tabBody"></div>`;
+  ({settings:tabSettings,status:tabStatus,worry:tabWorry,reveal:tabReveal,notes:tabNotes})[S.tab]();
+}
+actions.tab = b => { S.tab=b.dataset.t; renderTeacher(); };
+actions.reloadTeacher = async () => { await viewTeacher(); toast('새로 불러왔어요'); };
+
+function tabSettings(){
+  const cls=S.cls, rosterText = Object.keys(S.roster).sort((a,b)=>a-b).map(n=>`${n} ${S.roster[n]}`).join('\n');
+  $('#tabBody').innerHTML = `
+  <div class="panel"><h3>1. 진행 단계</h3>
+    <div class="row">${Object.entries(PHASES).map(([k,t])=>`<button class="btn ${cls.phase===k?'':'sub'}" data-act="phase" data-p="${k}">${t}</button>`).join('')}</div>
+    <p class="hint">• 카드 만드는 중: 학생이 카드를 만들고 고쳐요 (교생 쌤은 아직 못 봐요)<br>• 마감: 학생 수정 불가, 교생 쌤이 익명 카드를 열람해요<br>• 정답 공개: 교생 쌤 화면에 실명이 나타나요 (되돌릴 수 있어요)</p>
+    <label class="f">마감일(안내용)</label><div class="row"><input type="date" id="dl" value="${esc(cls.deadline||'')}" style="max-width:200px"><button class="btn sub small" data-act="saveDeadline">저장</button></div>
+  </div>
+  <div class="panel"><h3>2. 번호-이름 명단</h3>
+    <p class="hint">한 줄에 한 명씩 “번호 이름” 으로 붙여 넣으세요. (엑셀에서 두 열을 복사해도 돼요) 실명은 담임만 볼 수 있어요.</p>
+    <textarea id="rosterTx" style="min-height:160px" placeholder="1 김하늘&#10;2 이바다">${esc(rosterText)}</textarea>
+    <button class="btn" data-act="saveRoster">명단 저장</button></div>
+  <div class="panel"><h3>3. 교생 쌤 등록</h3>
+    <p class="hint">교생 쌤의 구글 이메일을 한 줄에 하나씩 적어요.</p>
+    <textarea id="internTx" placeholder="teacher1@gmail.com">${esc((S.access.internEmails||[]).join('\n'))}</textarea>
+    <button class="btn" data-act="saveInterns">교생 저장</button></div>
+  <div class="panel"><h3>4. 단서 질문 / 위험 키워드</h3>
+    <p class="hint">빈칸은 <code>____</code> 로 표시해요. (카드 작성이 시작된 뒤에 바꾸면 이미 쓴 단서와 어긋날 수 있어요)</p>
+    ${[0,1,2].map(i=>`<input type="text" class="cq" value="${esc(clueQs()[i])}" style="margin-bottom:6px">`).join('')}
+    <label class="f">위험 키워드 (쉼표로 구분, 담임 화면에서만 강조돼요)</label>
+    <textarea id="kwTx" style="min-height:60px">${esc(kws().join(', '))}</textarea>
+    <button class="btn" data-act="saveQs">저장</button></div>
+  <div class="panel"><h3>5. 내보내기 · 삭제</h3>
+    <div class="row"><button class="btn sub" data-act="exportJson">JSON 내보내기</button><button class="btn sub" data-act="exportCsv">CSV 내보내기</button></div>
+    <p class="hint" style="margin-top:12px">실습이 끝나면 아이들 정보를 지워 주세요. (실명·고민·그림 포함 전체 삭제)</p>
+    <button class="btn bad" data-act="wipe">🗑️ 이 학급 데이터 전체 삭제</button></div>`;
+}
+actions.phase = async b => {
+  const p = b.dataset.p; if (p===S.cls.phase) return;
+  if (p==='revealed' && !confirm('정답을 공개할까요? 교생 쌤 화면에 실명이 나타나요.')) return;
+  if (p==='writing' && S.cls.phase!=='writing' && !confirm('다시 “카드 만드는 중”으로 돌릴까요? 교생 쌤은 카드를 볼 수 없게 돼요.')) return;
+  const was = S.cls.phase;
+  if (p==='revealed') {
+    const batch = writeBatch(db);
+    S.cards.forEach(c=>{ const n=numOf(c); batch.set(C('reveals',c.id),{realName: nameOf(n) || (n?`${n}번`:'?')}); });
+    await batch.commit();
+  } else if (was==='revealed') {
+    const batch = writeBatch(db); S.cards.forEach(c=>batch.delete(C('reveals',c.id))); await batch.commit();
+  }
+  await updateDoc(doc(db,'classes',S.classId),{phase:p});
+  await viewTeacher(); toast('바꿨어요');
+};
+actions.saveDeadline = async () => { await updateDoc(doc(db,'classes',S.classId),{deadline:$('#dl').value}); toast('저장했어요'); };
+actions.saveRoster = async () => {
+  const map = {};
+  $('#rosterTx').value.split('\n').forEach(l=>{ const m=l.trim().match(/^(\d{1,2})[\s,\t]+(.+)$/); if (m) map[String(+m[1])]=m[2].trim(); });
+  const batch = writeBatch(db);
+  Object.keys(S.roster).forEach(n=>{ if(!(n in map)) batch.delete(C('roster',n)); });
+  Object.entries(map).forEach(([n,nm])=>batch.set(C('roster',n),{realName:nm}));
+  await batch.commit(); await viewTeacher('settings'); toast(`${Object.keys(map).length}명 저장했어요`);
+};
+actions.saveInterns = async () => {
+  const emails = $('#internTx').value.split(/[\n,;\s]+/).map(s=>s.trim().toLowerCase()).filter(Boolean);
+  await setDoc(C('config','access'),{internEmails:emails}); S.access={internEmails:emails}; toast(`교생 ${emails.length}명 저장했어요`);
+};
+actions.saveQs = async () => {
+  const qs = [...document.querySelectorAll('.cq')].map(i=>i.value.trim());
+  if (qs.some(q=>!q)) return toast('질문 세 개를 모두 채워 주세요');
+  const keywords = $('#kwTx').value.split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
+  await updateDoc(doc(db,'classes',S.classId),{clueQuestions:qs, keywords}); await viewTeacher('settings'); toast('저장했어요');
+};
+actions.exportJson = () => {
+  const data = { classId:S.classId, exportedAt:new Date().toISOString(), roster:S.roster,
+    cards:S.cards.map(c=>({...c, submittedAt:undefined, private:S.privs[c.id]||null, realName:nameOf((S.privs[c.id]||{}).num)})) };
+  download(`anoncard-${S.classId}.json`, JSON.stringify(data,null,1));
+};
+actions.exportCsv = () => {
+  const q = v => '"'+String(v??'').replace(/"/g,'""')+'"';
+  const rows = [['번호','이름','익명이름','꿈','단서','고민칩','고민원문','공개범위','도움요청']];
+  S.cards.slice().sort((a,b)=>(numOf(a)||0)-(numOf(b)||0)).forEach(c=>{ const p=S.privs[c.id]||{};
+    rows.push([p.num,nameOf(p.num),c.anonName,c.dreamEmoji+' '+c.dreamText,(c.clues||[]).join(' / '),(p.worryChips||[]).join(','),p.worryText,p.worryVisibility,p.wantsTalk?'예':'']); });
+  download(`anoncard-${S.classId}.csv`, '\ufeff'+rows.map(r=>r.map(q).join(',')).join('\n'), 'text/csv');
+};
+actions.wipe = async () => {
+  if (prompt('정말 삭제할까요? 되돌릴 수 없어요. 삭제하려면 “삭제”라고 입력하세요.')!=='삭제') return;
+  for (const name of ['cards','private','roster','reveals','anonNames']) {
+    const s = await getDocs(Col(name)); let b = writeBatch(db), n=0;
+    for (const d of s.docs){ b.delete(d.ref); if(++n%400===0){ await b.commit(); b=writeBatch(db);} }
+    await b.commit();
+  }
+  await updateDoc(doc(db,'classes',S.classId),{phase:'writing', pinVer:{}});
+  await viewTeacher('settings'); toast('삭제했어요');
+};
+
+function tabStatus(){
+  const nums = new Set([...Object.keys(S.roster), ...S.cards.map(numOf).filter(Boolean).map(String)]);
+  const byNum = {}; S.cards.forEach(c=>{ const n=numOf(c); if(n) byNum[n]=c; });
+  const list = [...nums].sort((a,b)=>a-b);
+  const done = list.filter(n=>byNum[n]).length;
+  $('#tabBody').innerHTML = `<div class="panel"><b>제출 ${done} / ${list.length}명</b>
+   ${list.length===0?'<p class="hint">설정 탭에서 명단을 먼저 저장해 주세요.</p>':''}
+   <table class="t" style="margin-top:8px"><tr><th>번호</th><th>이름</th><th>제출</th><th>익명 이름</th><th>도움 요청</th></tr>
+   ${list.map(n=>{ const c=byNum[n]; const p=c?S.privs[c.id]:null; return `<tr><td>${n}</td><td>${esc(nameOf(n))}</td><td>${c?'<span class="badge green">제출</span>':'<span class="badge red">미제출</span>'}</td><td>${c?esc(c.anonName):''}${c&&c.hidden?' <span class="badge orange">숨김</span>':''}</td><td>${p&&p.wantsTalk?'<span class="badge red">면담 희망</span>':''}</td></tr>`; }).join('')}</table></div>`;
+}
+function tabWorry(){
+  const rows = S.cards.map(c=>({c,p:S.privs[c.id]||{}})).filter(x=>x.p.worryVisibility!=='none' || x.p.wantsTalk);
+  const score = x => (x.p.wantsTalk?2:0)+(hasKw(x.p.worryText)?1:0);
+  rows.sort((a,b)=>score(b)-score(a) || (a.p.num||0)-(b.p.num||0));
+  const visL = {teacher:'담임에게만',intern:'교생 공개',none:'쓰지 않음'};
+  $('#tabBody').innerHTML = `<div class="hint">면담 희망·위험 키워드 카드가 위에 나와요. 키워드 감지는 보조 수단이니 꼭 직접 읽어 주세요.</div>` +
+   (rows.map(({c,p})=>{ const need=p.wantsTalk, flag=hasKw(p.worryText);
+     return `<div class="worry ${need?'need':flag?'flag':''}"><div class="row between"><b>${p.num}번 ${esc(nameOf(p.num))} <span class="hint">(${esc(c.anonName)})</span></b>
+       <span>${need?'<span class="badge red">면담 희망</span>':''}${flag?'<span class="badge orange">키워드</span>':''}<span class="badge">${visL[p.worryVisibility]||''}</span></span></div>
+       <div>${(p.worryChips||[]).map(w=>`<span class="badge blue">${esc(w)}</span>`).join(' ')}</div>
+       <div style="margin:4px 0">${p.worryText?highlight(p.worryText):'<span class="hint">(글로 쓴 내용 없음)</span>'}</div>
+       <div class="row"><button class="btn sub small" data-act="toggleHide" data-id="${c.id}">${c.hidden?'숨김 해제':'카드 숨기기'}</button>
+       <button class="btn sub small" data-act="resetStudent" data-id="${c.id}">이 번호 초기화</button></div></div>`; }).join('') || '<div class="panel hint">아직 제출된 고민이 없어요.</div>');
+}
+actions.toggleHide = async b => {
+  const c = S.cards.find(x=>x.id===b.dataset.id); await updateDoc(C('cards',c.id),{hidden:!c.hidden}); await viewTeacher('worry');
+};
+actions.resetStudent = async b => {
+  const c = S.cards.find(x=>x.id===b.dataset.id), n = numOf(c);
+  if (!confirm(`${n}번의 카드를 삭제하고 처음부터 다시 만들게 할까요? (비밀번호 분실·내용 문제 때 사용)`)) return;
+  const batch = writeBatch(db);
+  batch.delete(C('cards',c.id)); batch.delete(C('private',c.id)); batch.delete(C('anonNames',c.anonName.toLowerCase())); batch.delete(C('reveals',c.id));
+  const pinVer = Object.assign({}, S.cls.pinVer||{}); pinVer[n] = (pinVer[n]||0)+1;
+  batch.update(doc(db,'classes',S.classId),{pinVer});
+  await batch.commit(); await viewTeacher('worry'); toast('초기화했어요. 학생이 새 비밀번호로 다시 들어오면 돼요');
+};
+
+function tabReveal(){
+  const rows = S.cards.slice().sort((a,b)=>(numOf(a)||0)-(numOf(b)||0));
+  $('#tabBody').innerHTML = `<div class="panel"><div class="row between"><h3>익명 이름 ↔ 실명</h3><button class="btn" data-act="revealShow">🎬 카드 한 장씩 뒤집기</button></div>
+   <p class="hint">전자칠판에 비추면서 한 장씩 공개해요. “정답 공개” 단계로 바꾸면 교생 쌤 화면에도 실명이 보여요.</p>
+   <table class="t"><tr><th>익명 이름</th><th>번호</th><th>실명</th></tr>${rows.map(c=>`<tr><td>${esc(c.anonName)}</td><td>${numOf(c)||''}</td><td>${esc(nameOf(numOf(c)))}</td></tr>`).join('')}</table></div>`;
+}
+actions.revealShow = () => {
+  const list = S.cards.filter(c=>!c.hidden); for (let i=list.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [list[i],list[j]]=[list[j],list[i]]; }
+  S.rv = {list, i:0, open:false}; renderReveal();
+};
+function renderReveal(){
+  const {list,i,open} = S.rv; if (!list.length) return toast('공개할 카드가 없어요');
+  const c = list[i], n = numOf(c), real = nameOf(n) || (n?`${n}번`:'?');
+  app.innerHTML = `<div class="row between noprint"><button class="btn sub small" data-act="revealExit">← 나가기</button><span class="hint">${i+1} / ${list.length}</span></div>
+   <div class="reveal-stage">
+    <div class="pcard ${open?'flip':''}" style="max-width:380px"><img class="pic" src="${c.drawing}" alt=""><div class="nm" style="font-size:2rem">${esc(c.anonName)}</div>
+      <div class="dream">${esc(c.dreamEmoji)} ${esc(c.dreamText)}</div></div>
+    ${open?`<div class="realname">🎉 ${esc(real)} 🎉</div>`:`<div class="hint" style="font-size:1.3rem">누구일까요?</div>`}
+    <div class="row"><button class="btn sub" data-act="rvPrev" ${i===0?'disabled':''}>← 이전</button>
+      <button class="btn good" data-act="rvFlip">${open?'다시 가리기':'정답 보기!'}</button>
+      <button class="btn sub" data-act="rvNext" ${i===list.length-1?'disabled':''}>다음 →</button></div></div>`;
+}
+actions.rvFlip = () => { S.rv.open=!S.rv.open; renderReveal(); };
+actions.rvNext = () => { S.rv.i++; S.rv.open=false; renderReveal(); };
+actions.rvPrev = () => { S.rv.i--; S.rv.open=false; renderReveal(); };
+actions.revealExit = () => renderTeacher();
+
+function tabNotes(){
+  const byId = {}; S.cards.forEach(c=>byId[c.id]=c);
+  $('#tabBody').innerHTML = (S.sharedNotes.map(n=>{ const c=byId[n.cardId]; if(!c) return ''; const p=S.privs[c.id]||{};
+    return `<div class="worry"><b>${esc(c.anonName)} <span class="hint">${p.num}번 ${esc(nameOf(p.num))}</span></b>
+      <div class="hint">교생 추측: ${esc(n.guess||'-')} ${'★'.repeat(n.confidence||1)}</div>
+      ${(n.observations||[]).map(o=>`<div><span class="hint">${esc(o.date)}</span> ${esc(o.text)}</div>`).join('')}</div>`; }).join('')
+    || '<div class="panel hint">교생 쌤이 공유한 노트가 아직 없어요.</div>');
+}
+
+/* ---------------------------- 시작 ---------------------------- */
+viewStart();
+</script>
+</body>
+</html>

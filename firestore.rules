@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- 공통 함수 ----------
+    function signed() { return request.auth != null; }
+    function isGoogle() {
+      return signed() && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+    function classData(c) { return get(/databases/$(database)/documents/classes/$(c)).data; }
+    function phase(c) { return classData(c).phase; }
+    function isTeacher(c) { return isGoogle() && classData(c).teacherUid == request.auth.uid; }
+    function isIntern(c) {
+      return isGoogle() && request.auth.token.email != null
+        && request.auth.token.email.lower() in
+           get(/databases/$(database)/documents/classes/$(c)/config/access).data.internEmails;
+    }
+    // 교생에게 공개하지 않기로 한 고민은 cards 문서에 들어올 수 없다.
+    function validCard(d) {
+      return d.anonName is string && d.anonName.size() >= 1 && d.anonName.size() <= 20
+        && d.drawing is string && d.drawing.size() < 400000
+        && d.dreamText.size() <= 60
+        && d.worryVisibility in ['teacher', 'intern', 'none']
+        && (d.worryVisibility == 'intern'
+            || (d.worryText == '' && d.worryChips.size() == 0));
+    }
+
+    match /classes/{c} {
+      // 학급 코드 확인용(학생 로그인 전). 민감 정보는 이 문서에 두지 않는다.
+      allow get: if true;
+      allow create: if isGoogle()
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.phase == 'writing';
+      allow update, delete: if isTeacher(c);
+
+      // 교생 이메일 목록 (담임만)
+      match /config/{d} {
+        allow read, write: if isTeacher(c);
+      }
+
+      // 익명 카드 (실명·번호 없음)
+      match /cards/{id} {
+        allow read: if signed() && (
+          resource.data.ownerUid == request.auth.uid
+          || isTeacher(c)
+          || (isIntern(c) && phase(c) != 'writing' && resource.data.hidden == false)
+        );
+        allow create: if signed()
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.hidden == false
+          && phase(c) == 'writing'
+          && validCard(request.resource.data);
+        allow update: if signed() && (
+          (resource.data.ownerUid == request.auth.uid
+            && request.resource.data.ownerUid == request.auth.uid
+            && request.resource.data.hidden == resource.data.hidden
+            && phase(c) == 'writing'
+            && validCard(request.resource.data))
+          || isTeacher(c)
+        );
+        allow delete: if isTeacher(c);
+      }
+
+      // 번호 + 고민 원문 (본인·담임만)
+      match /private/{id} {
+        allow read: if signed() && (resource.data.ownerUid == request.auth.uid || isTeacher(c));
+        allow create: if signed()
+          && request.resource.data.ownerUid == request.auth.uid
+          && phase(c) == 'writing';
+        allow update: if signed()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == request.auth.uid
+          && phase(c) == 'writing';
+        allow delete: if isTeacher(c);
+      }
+
+      // 번호 - 실명 명단 (담임만)
+      match /roster/{n} {
+        allow read, write: if isTeacher(c);
+      }
+
+      // 정답 공개 후에만 교생이 읽을 수 있는 실명
+      match /reveals/{id} {
+        allow read: if isTeacher(c) || (isIntern(c) && phase(c) == 'revealed');
+        allow write: if isTeacher(c);
+      }
+
+      // 익명 이름 중복 방지
+      match /anonNames/{n} {
+        allow get: if signed();
+        allow create: if signed()
+          && request.resource.data.ownerUid == request.auth.uid
+          && phase(c) == 'writing';
+        allow delete: if signed() && (resource.data.ownerUid == request.auth.uid || isTeacher(c));
+      }
+
+      // 교생 추측·관찰 노트 (작성자만, 담임은 '공유'한 것만)
+      match /internNotes/{n} {
+        allow read: if signed() && (
+          resource.data.internUid == request.auth.uid
+          || (isTeacher(c) && resource.data.sharedWithTeacher == true)
+        );
+        allow create: if isIntern(c)
+          && request.resource.data.internUid == request.auth.uid
+          && n.matches(request.auth.uid + '_.*');
+        allow update: if isIntern(c)
+          && resource.data.internUid == request.auth.uid
+          && request.resource.data.internUid == request.auth.uid;
+        allow delete: if signed() && (resource.data.internUid == request.auth.uid || isTeacher(c));
+      }
+    }
+  }
+}
