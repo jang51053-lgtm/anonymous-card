@@ -157,8 +157,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 let toastTimer;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2800); }
 const S = { role:null, classId:null, cls:null, user:null };
-const C = (...p) => doc(db,'classes',S.classId,...p);
-const Col = n => collection(db,'classes',S.classId,n);
+const C = (...p) => doc(db,'anoncls',S.classId,...p);
+const Col = n => collection(db,'anoncls',S.classId,n);
 const todayStr = () => new Date().toISOString().slice(0,10);
 function showErr(e){
   console.error(e);
@@ -252,7 +252,7 @@ actions.start = async (b) => {
   return googleLogin(role);
 };
 async function loadClass(){
-  const s = await getDoc(doc(db,'classes',S.classId));
+  const s = await getDoc(doc(db,'anoncls',S.classId));
   S.cls = s.exists() ? s.data() : null;
   return S.cls;
 }
@@ -573,7 +573,7 @@ async function googleLogin(role){
   if (role==='teacher') {
     if (!cls) {
       if (!confirm(`'${S.classId}' 학급이 아직 없어요. 새 학급으로 만들까요?`)) return;
-      await setDoc(doc(db,'classes',S.classId), { teacherUid:S.user.uid, phase:'writing', deadline:'', clueQuestions:DEFAULT_CLUES, keywords:DEFAULT_KEYWORDS, pinVer:{}, createdAt:serverTimestamp() });
+      await setDoc(doc(db,'anoncls',S.classId), { teacherUid:S.user.uid, phase:'writing', deadline:'', clueQuestions:DEFAULT_CLUES, keywords:DEFAULT_KEYWORDS, pinVer:{}, createdAt:serverTimestamp() });
       await setDoc(C('config','access'), { internEmails:[] });
       await loadClass();
     } else if (cls.teacherUid !== S.user.uid) return toast('이 학급의 담임 계정이 아니에요');
@@ -771,10 +771,10 @@ actions.phase = async b => {
   } else if (was==='revealed') {
     const batch = writeBatch(db); S.cards.forEach(c=>batch.delete(C('reveals',c.id))); await batch.commit();
   }
-  await updateDoc(doc(db,'classes',S.classId),{phase:p});
+  await updateDoc(doc(db,'anoncls',S.classId),{phase:p});
   await viewTeacher(); toast('바꿨어요');
 };
-actions.saveDeadline = async () => { await updateDoc(doc(db,'classes',S.classId),{deadline:$('#dl').value}); toast('저장했어요'); };
+actions.saveDeadline = async () => { await updateDoc(doc(db,'anoncls',S.classId),{deadline:$('#dl').value}); toast('저장했어요'); };
 actions.saveRoster = async () => {
   const map = {};
   $('#rosterTx').value.split('\n').forEach(l=>{ const m=l.trim().match(/^(\d{1,2})[\s,\t]+(.+)$/); if (m) map[String(+m[1])]=m[2].trim(); });
@@ -791,7 +791,7 @@ actions.saveQs = async () => {
   const qs = [...document.querySelectorAll('.cq')].map(i=>i.value.trim());
   if (qs.some(q=>!q)) return toast('질문 세 개를 모두 채워 주세요');
   const keywords = $('#kwTx').value.split(/[,\n]/).map(s=>s.trim()).filter(Boolean);
-  await updateDoc(doc(db,'classes',S.classId),{clueQuestions:qs, keywords}); await viewTeacher('settings'); toast('저장했어요');
+  await updateDoc(doc(db,'anoncls',S.classId),{clueQuestions:qs, keywords}); await viewTeacher('settings'); toast('저장했어요');
 };
 actions.exportJson = () => {
   const data = { classId:S.classId, exportedAt:new Date().toISOString(), roster:S.roster,
@@ -812,7 +812,7 @@ actions.wipe = async () => {
     for (const d of s.docs){ b.delete(d.ref); if(++n%400===0){ await b.commit(); b=writeBatch(db);} }
     await b.commit();
   }
-  await updateDoc(doc(db,'classes',S.classId),{phase:'writing', pinVer:{}});
+  await updateDoc(doc(db,'anoncls',S.classId),{phase:'writing', pinVer:{}});
   await viewTeacher('settings'); toast('삭제했어요');
 };
 
@@ -849,7 +849,7 @@ actions.resetStudent = async b => {
   const batch = writeBatch(db);
   batch.delete(C('cards',c.id)); batch.delete(C('private',c.id)); batch.delete(C('anonNames',c.anonName.toLowerCase())); batch.delete(C('reveals',c.id));
   const pinVer = Object.assign({}, S.cls.pinVer||{}); pinVer[n] = (pinVer[n]||0)+1;
-  batch.update(doc(db,'classes',S.classId),{pinVer});
+  batch.update(doc(db,'anoncls',S.classId),{pinVer});
   await batch.commit(); await viewTeacher('worry'); toast('초기화했어요. 학생이 새 비밀번호로 다시 들어오면 돼요');
 };
 
