@@ -4,14 +4,18 @@ service cloud.firestore {
 
     // ---------- 공통 함수 ----------
     function signed() { return request.auth != null; }
-    function isGoogle() {
-      return signed() && request.auth.token.firebase.sign_in_provider == 'google.com';
+    // 담임·교생: 이메일/비밀번호 계정 중 학생용 가짜 이메일(@card.app)이 아닌 것
+    function isStaff() {
+      return signed()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email != null
+        && !request.auth.token.email.matches('.*@card[.]app');
     }
     function classData(c) { return get(/databases/$(database)/documents/anoncls/$(c)).data; }
     function phase(c) { return classData(c).phase; }
-    function isTeacher(c) { return isGoogle() && classData(c).teacherUid == request.auth.uid; }
+    function isTeacher(c) { return isStaff() && classData(c).teacherUid == request.auth.uid; }
     function isIntern(c) {
-      return isGoogle() && request.auth.token.email != null
+      return isStaff() && request.auth.token.email != null
         && request.auth.token.email.lower() in
            get(/databases/$(database)/documents/anoncls/$(c)/config/access).data.internEmails;
     }
@@ -28,7 +32,7 @@ service cloud.firestore {
     match /anoncls/{c} {
       // 학급 코드 확인용(학생 로그인 전). 민감 정보는 이 문서에 두지 않는다.
       allow get: if true;
-      allow create: if isGoogle()
+      allow create: if isStaff()
         && request.resource.data.teacherUid == request.auth.uid
         && request.resource.data.phase == 'writing';
       allow update, delete: if isTeacher(c);
