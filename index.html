@@ -205,7 +205,9 @@ function cardHTML(c, o={}){
 
 /* ---------------------------- 이벤트 위임 ---------------------------- */
 const actions = {};
-app.addEventListener('click', e => {
+document.addEventListener('click', e => {
+  const mo = e.target.id==='modal' ? e.target : null;   // 어두운 배경을 누르면 닫기
+  if (mo) { actions.closeModal(); return; }
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const fn = actions[b.dataset.act];
@@ -686,7 +688,8 @@ actions.openCard = b => {
    </div></div></div>`;
   document.body.appendChild(m);
 };
-actions.closeModal = () => { const m=$('#modal'); if(m) m.remove(); };
+actions.closeModal = () => { document.querySelectorAll('#modal').forEach(m=>m.remove()); };
+document.addEventListener('keydown', e => { if (e.key==='Escape') actions.closeModal(); });
 actions.saveNote = async () => {
   const id = S.openId, old = S.notes[id] || {observations:[]};
   const obs = (old.observations||[]).slice(); const t = ($('#mObs').value||'').trim();
