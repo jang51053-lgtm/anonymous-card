@@ -21,6 +21,8 @@ h1{font-size:2rem} h2{font-size:1.5rem} h3{font-size:1.2rem}
 #app{max-width:1000px;margin:0 auto;padding:16px 14px 80px}
 .narrow{max-width:520px;margin:0 auto}
 .panel{background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:18px;margin:14px 0;box-shadow:0 3px 0 var(--line)}
+button,.chip,.sw{touch-action:manipulation}
+#cv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .btn{font:inherit;font-family:'Jua','Gowun Dodum',sans-serif;font-size:1.05rem;border:0;border-radius:14px;padding:12px 18px;min-height:46px;cursor:pointer;background:var(--main);color:#fff;box-shadow:0 3px 0 rgba(0,0,0,.18);touch-action:manipulation}
 .btn:active{transform:translateY(2px);box-shadow:none}
 .btn.sub{background:#fff;color:var(--ink);border:2px solid var(--line);box-shadow:0 3px 0 var(--line)}
@@ -115,7 +117,7 @@ mark{background:#ffd8a8;padding:0 2px;border-radius:3px}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, serverTimestamp }
+import { initializeFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, writeBatch, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* =====================================================================
@@ -134,7 +136,8 @@ const CONFIGURED = !/^YOUR_/.test(firebaseConfig.apiKey);
 let db = null;
 if (CONFIGURED) {
   const fb = initializeApp(firebaseConfig);
-  db = getFirestore(fb);
+  // 학교 와이파이·필터 환경에서도 끊기지 않도록 연결 방식을 자동 선택
+  db = initializeFirestore(fb, { experimentalAutoDetectLongPolling: true });
 }
 
 /* ---------------------------- 상수 ---------------------------- */
@@ -474,13 +477,22 @@ async function nameTaken(n){
   const s = await getDoc(C('anonNames', n.toLowerCase()));
   return s.exists() && s.data().num !== S.num;
 }
-actions.prev = () => { if (S.step===2) grabDrawing(); S.step--; viewWizard(); };
+actions.prev = () => { if (navLock) return; navLock=true; setTimeout(()=>navLock=false,350); if (S.step===2) grabDrawing(); S.step--; viewWizard(); };
+let navLock = false, warnedStep = 0;
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
 actions.next = async () => {
+  if (navLock) return;                       // 연타해도 한 칸만 넘어가요
+  navLock = true;
+  try { await goNext(); } finally { setTimeout(()=>navLock=false,350); }
+};
+async function goNext(){
   const d=S.draft, st=S.step;
   if (st===1) {
     d.anonName = (d.anonName||'').trim();
     const v = validName(d.anonName); if (v) return toast(v);
-    if (await nameTaken(d.anonName)) return toast('이미 쓰고 있는 이름이에요. 다른 이름을 지어요');
+    const nb = document.querySelector('[data-act=next]'); if (nb) nb.textContent = '확인 중…';
+    try { if (await withTimeout(nameTaken(d.anonName), 4000)) { if (nb) nb.textContent='다음 →'; return toast('이미 쓰고 있는 이름이에요. 다른 이름을 지어요'); } }
+    catch(e){ /* 네트워크가 느리면 일단 진행하고, 제출할 때 한 번 더 확인해요 */ }
   }
   if (st===2) { grabDrawing(); if (!d.drawing || !inkDrawn) return toast('캐릭터를 그려 주세요! (스탬프도 좋아요)'); }
   if (st===3 && !(d.dreamText||'').trim()) return toast('꿈을 한 줄 적어 주세요');
@@ -488,10 +500,14 @@ actions.next = async () => {
   if (st===5) {
     if (d.clues.filter(x=>x.trim()).length<2) return toast('단서를 두 개 이상 써 주세요');
     const all = d.clues.join(' ')+' '+d.secretHint;
-    if (/(번호|자리|안경|초성|키가|[0-9]{1,2}번)/.test(all) && !confirm('쓰면 안 되는 단서(번호·자리·외모·초성)가 들어 있는 것 같아요. 그대로 갈까요?')) return;
+    if (/(번호|앉은 ?자리|내 ?자리|안경|초성|키가|[0-9]{1,2}번)/.test(all) && warnedStep!==5) {
+      warnedStep = 5;   // 확인창 대신 안내만 하고, 한 번 더 누르면 넘어가요
+      return toast('쓰면 안 되는 단서(번호·자리·외모·초성)가 있는 것 같아요. 그대로 가려면 [다음]을 한 번 더!');
+    }
   }
+  warnedStep = 0;
   saveDraft(); S.step++; viewWizard();
-};
+}
 actions.submit = async () => {
   const d = S.draft;
   const btn = document.querySelector('[data-act=submit]'); if (btn) btn.disabled = true;
@@ -524,15 +540,19 @@ actions.submit = async () => {
 let cvx, tool='pen', color='#222222', size=8, stamp='😊', snaps=[], inkDrawn=false, stampBase=null, drawing=false, last=null;
 function initCanvas(){
   const cv = $('#cv'); cvx = cv.getContext('2d'); cvx.lineCap='round'; cvx.lineJoin='round';
-  snaps = []; inkDrawn = false; tool='pen';
+  snaps = []; inkDrawn = false; tool='pen'; drawing = false;
   const restore = () => {
     if (!S.draft.drawing) return;
-    const img = new Image(); img.onload = ()=>{ cvx.drawImage(img,0,0,CV,CV); inkDrawn=true; }; img.src = S.draft.drawing;
+    inkDrawn = true;   // 불러오는 동안 [다음]을 눌러도 그림이 사라지지 않게
+    const img = new Image(); img.onload = ()=>{ cvx.drawImage(img,0,0,CV,CV); }; img.src = S.draft.drawing;
   };
   restore();
   const pos = e => { const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*CV/r.width, y:(e.clientY-r.top)*CV/r.height}; };
+  cv.oncontextmenu = e => e.preventDefault();
   cv.onpointerdown = e => {
-    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    if (drawing || e.isPrimary===false) return;   // 손바닥·두 번째 손가락은 무시
+    try { cv.setPointerCapture(e.pointerId); } catch(_) {}
     pushSnap(); drawing=true; const p=pos(e); last=p;
     if (tool==='bg') { cvx.globalCompositeOperation='destination-over'; cvx.fillStyle=color; cvx.fillRect(0,0,CV,CV); cvx.globalCompositeOperation='source-over'; inkDrawn=true; drawing=false; return; }
     if (tool==='stamp') { stampBase = cvx.getImageData(0,0,CV,CV); drawStamp(p); return; }
@@ -547,7 +567,7 @@ function initCanvas(){
     cvx.beginPath(); cvx.moveTo(last.x,last.y); cvx.lineTo(p.x,p.y); cvx.stroke(); last=p;
   };
   const end = e => { if (!drawing) return; drawing=false; cvx.globalCompositeOperation='source-over'; if (tool==='stamp') inkDrawn=true; };
-  cv.onpointerup = end; cv.onpointercancel = end;
+  cv.onpointerup = end; cv.onpointercancel = end; cv.onlostpointercapture = end;
   markTool();
 }
 function drawStamp(p){
@@ -568,7 +588,7 @@ actions.color = b => { color=b.dataset.c; if (tool==='eraser'||tool==='stamp') t
 actions.size = b => { size=+b.dataset.s; if (tool!=='pen'&&tool!=='eraser') tool='pen'; markTool(); };
 actions.stampPick = b => { stamp=b.dataset.s; tool='stamp'; markTool(); };
 actions.undo = () => { const s=snaps.pop(); if (!s) return toast('더 되돌릴 게 없어요'); cvx.putImageData(s,0,0); };
-actions.clearCv = () => { if (!confirm('그림을 모두 지울까요?')) return; pushSnap(); cvx.clearRect(0,0,CV,CV); inkDrawn=false; };
+actions.clearCv = () => { pushSnap(); toast('모두 지웠어요. 되돌리기로 살릴 수 있어요'); cvx.clearRect(0,0,CV,CV); inkDrawn=false; };
 function grabDrawing(){
   if (!cvx || !$('#cv')) return;
   const out = document.createElement('canvas'); out.width=CV; out.height=CV;
