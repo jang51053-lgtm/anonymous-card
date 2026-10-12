@@ -22,6 +22,8 @@ h1{font-size:2rem} h2{font-size:1.5rem} h3{font-size:1.2rem}
 .narrow{max-width:520px;margin:0 auto}
 .panel{background:var(--card);border:2px solid var(--line);border-radius:var(--r);padding:18px;margin:14px 0;box-shadow:0 3px 0 var(--line)}
 button,.chip,.sw{touch-action:manipulation}
+[data-act],.modal{cursor:pointer}   /* iOS Safari는 cursor:pointer가 있어야 위임된 클릭을 받아요 */
+#cv{cursor:crosshair}
 #cv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .btn{font:inherit;font-family:'Jua','Gowun Dodum',sans-serif;font-size:1.05rem;border:0;border-radius:14px;padding:12px 18px;min-height:46px;cursor:pointer;background:var(--main);color:#fff;box-shadow:0 3px 0 rgba(0,0,0,.18);touch-action:manipulation}
 .btn:active{transform:translateY(2px);box-shadow:none}
@@ -208,7 +210,23 @@ function cardHTML(c, o={}){
 
 /* ---------------------------- 이벤트 위임 ---------------------------- */
 const actions = {};
+/* 아이패드: 키보드가 열린 채로 [다음]을 누르면 첫 터치가 키보드 닫기에 쓰여 클릭이 사라져요.
+   그래서 손가락이 닿는 순간(pointerdown) 바로 처리하고, 뒤따르는 click은 navLock 으로 무시해요. */
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType!=='touch' && e.pointerType!=='pen') return;
+  const b = e.target.closest && e.target.closest('[data-act=next],[data-act=prev]');
+  if (!b || b.disabled) return;
+  const ae = document.activeElement; if (ae && ae.blur && /INPUT|TEXTAREA/.test(ae.tagName)) ae.blur();
+  touchNav = true;
+  const fn = actions[b.dataset.act]; if (fn) Promise.resolve(fn(b,e)).catch(showErr);
+  e.preventDefault();
+});
+let touchNav = false, touchNavUntil = 0;
+const endTouchNav = () => { if (touchNav) { touchNav = false; touchNavUntil = Date.now()+600; } };
+document.addEventListener('pointerup', endTouchNav); document.addEventListener('pointercancel', endTouchNav);
 document.addEventListener('click', e => {
+  // 손가락으로 이미 처리한 [다음]/[이전]의 뒤따르는 클릭은 무시 (새로 그려진 버튼이 눌리는 것 방지)
+  if ((touchNav || Date.now()<touchNavUntil) && e.target.closest && e.target.closest('[data-act=next],[data-act=prev]')) return;
   const mo = e.target.id==='modal' ? e.target : null;   // 어두운 배경을 누르면 닫기
   if (mo) { actions.closeModal(); return; }
   const b = e.target.closest('[data-act]');
@@ -549,6 +567,9 @@ function initCanvas(){
   restore();
   const pos = e => { const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*CV/r.width, y:(e.clientY-r.top)*CV/r.height}; };
   cv.oncontextmenu = e => e.preventDefault();
+  // 구형 iPad Safari 대비: 캔버스 위 터치가 화면 스크롤·확대로 넘어가지 않게
+  cv.addEventListener('touchstart', e => e.preventDefault(), {passive:false});
+  cv.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
   cv.onpointerdown = e => {
     e.preventDefault();
     if (drawing || e.isPrimary===false) return;   // 손바닥·두 번째 손가락은 무시
